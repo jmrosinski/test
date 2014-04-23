@@ -1,0 +1,6 @@
+#!/bin/csh 
+setenv I_MPI_MIC enable
+mpiexec.hydra -host localhost -n 1 ./a.out : -host `hostname`-mic0 -n 3 \
+        -env LD_LIBRARY_PATH $MIC_LD_LIBRARY_PATH \
+        /nfs/scratch1/rosinski/mic/a.out
+exit 0

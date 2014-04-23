@@ -1,0 +1,6 @@
+"make" will build an a.out from fmain.F90 and prbits.c. Running a.out will
+ask 32-bit vs 64-bit, then numerator and denominator. It will then use
+prbits.c to print in binary and hex values.
+
+You can then mouse the appropriate output into the appropriate portions of
+testbits.c or testbits.F90, compile, and see what gets printed.

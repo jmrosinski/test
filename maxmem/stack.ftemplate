@@ -1,0 +1,24 @@
+program main
+  implicit none
+
+  write(6,*) 'Testing stacksize of ', #NMB, ' MB'
+  call sub ()
+  write(6,*) 'Success'
+  stop 0
+end program main
+
+subroutine sub ()
+  implicit none
+
+  integer :: i,j
+  integer, parameter :: megabyte = 1048576
+  character(len=1) :: bigthing(megabyte,#NMB)
+
+  do i=1,#NMB
+    do j=1,megabyte
+      bigthing(j,i) = 'x'
+    end do
+  end do
+
+  return
+end subroutine sub

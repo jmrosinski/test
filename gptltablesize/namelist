@@ -1,0 +1,4 @@
+&gptlnl
+  verbose = .true.
+  tablesize = 1
+/

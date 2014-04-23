@@ -1,0 +1,5 @@
+o mean_sigma.c: Enter up to 100 numbers for mean, std. dev. calc. by naive
+  calculation
+o synthetic.c: Enter ntasks, and it mimics MPI to print who sends/recvs
+o treesum.c: Uses MPI to do a tree sum of "iam", then compares to naive method.
+o jr_reduce.c: Compares JR reduce time vs. MPI_Reduce

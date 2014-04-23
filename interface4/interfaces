@@ -1,0 +1,6 @@
+interface
+  subroutine sub(arr)
+    use dims, only: nip
+    real, intent(in) :: arr(nip)
+  end subroutine sub
+end interface

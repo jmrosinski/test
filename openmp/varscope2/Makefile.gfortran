@@ -1,0 +1,14 @@
+FC = gfortran
+CC = gcc
+FFLAGS = -O2 -fopenmp -frecursive
+LDFLAGS = -fopenmp
+OBJS = main.o sub.o getaddress.o
+
+a.out: $(OBJS)
+	$(FC) $(LDFLAGS) -o $@ $(OBJS)
+
+%.o : %.F90
+	$(FC) -c $(FFLAGS) $<
+
+clean:
+	$(RM) $(OBJS) a.out

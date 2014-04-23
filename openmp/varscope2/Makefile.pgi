@@ -1,0 +1,14 @@
+FC = pgf90
+CC = pgcc
+FFLAGS = -O2 -mp
+LDFLAGS = -mp
+OBJS = main.o sub.o getaddress.o
+
+a.out: $(OBJS)
+	$(FC) $(LDFLAGS) -o $@ $(OBJS)
+
+%.o : %.F90
+	$(FC) -c $(FFLAGS) $<
+
+clean:
+	$(RM) $(OBJS) a.out

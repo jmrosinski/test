@@ -1,0 +1,3 @@
+Need to keep module_header.F90 up to date with NIM trunk.
+writer driver writeit writes a header record for some resolutions.
+reader driver readit tries to parse that record.

@@ -1,0 +1,17 @@
+FC = gfortran
+CC = gcc
+FFLAGS = -O2 -fopenmp -fbacktrace
+LDFLAGS = -fopenmp
+OBJS = main.o sub.o printmyaddress.o
+
+a.out: $(OBJS)
+	$(FC) $(LDFLAGS) -o $@ $(OBJS)
+
+%.o : %.f90
+	$(FC) -c $(FFLAGS) $<
+
+#sub.o: sub.f90
+#	$(FC) -c -g -traceback $<
+
+clean:
+	$(RM) $(OBJS) a.out

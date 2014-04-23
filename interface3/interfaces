@@ -1,0 +1,13 @@
+  interface
+
+     subroutine sub(a,m,x)
+     real a,x(:)
+     integer m
+     end subroutine sub
+
+     subroutine sub2(a,m,x)
+     real a,x(:)
+     integer m
+     end subroutine sub2
+
+  end interface

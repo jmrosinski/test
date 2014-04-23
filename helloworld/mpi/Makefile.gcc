@@ -1,0 +1,17 @@
+CC = scgcc
+FC = scgfortran
+COBJS = main.o error.o
+FOBJS = fmain.o
+LDFLAGS = -lmpich -lscdma -lpmi
+
+all: a.out a.fout
+
+a.out: $(COBJS)
+	$(CC) -o $@ $(COBJS) $(LDFLAGS)
+a.fout: $(FOBJS)
+	$(FC) -o $@ $(FOBJS) $(LDFLAGS)
+clean:
+	$(RM) $(OBJS) a.out
+
+fmain.o: fmain.f95
+	$(FC) -c -o $@ $<

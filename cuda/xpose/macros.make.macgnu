@@ -1,0 +1,8 @@
+FC         = gfortran
+GPU_HOME   = /Users/rosinski/F2C-ACC
+F2C        = $(GPU_HOME)/bin/F2C-ACC
+M4_INCLUDE = /Users/rosinski/F2C-ACC/include/logical.m4 /Users/rosinski/F2C-ACC/include/ARCH.m4
+NVCC       = /usr/local/cuda/bin/nvcc
+NVCC_FLAGS = -pg -arch=sm_11
+mCUDA      = /Developer/GPU\ Computing/C
+LIBCUDA    = -L/usr/local/cuda/lib -lcudart -L/Developer/GPU\ Computing/C/lib -lcutil_i386 -lstdc++-static
