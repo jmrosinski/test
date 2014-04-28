@@ -10,22 +10,11 @@
 #include <linux/kernel.h>
 #endif
 
-#if ( defined SGI )
-
-#define NPCONF _SC_NPROC_CONF
-#define NPONLN _SC_NPROC_ONLN
-
-#elif ( defined CRAY )
-
-#define NPCONF _SC_CRAY_NCPU
-#define NPONLN _SC_CRAY_NCPU
-
-#endif
-
 #define FALSE 0
 #define TRUE 1
-#define ONEKB 1024
-static const int onemb = ONEKB * ONEKB;
+#define ONEKB 1024UL
+static const unsigned int onemb = ONEKB * ONEKB;
+static const unsigned long onegb = ONEKB * ONEKB * ONEKB;
 
 void speedchk (int, int);
 
@@ -66,47 +55,44 @@ main(int argc, char **argv)
   printf("Max open files per process =    %lu\n",(unsigned long) sysconf(_SC_OPEN_MAX));
   printf("Version of POSIX.1 =            %lu\n",(unsigned long) sysconf(_SC_VERSION));
 
-#if ( defined CRAY ) || ( defined SGI )
-  printf("Number of CPUs configured =     %lu\n",(unsigned long) sysconf(NPCONF));
-  ncpus = sysconf(NPONLN);
-  printf("Number of CPUs online =         %d\n",ncpus);
-#endif
+  printf("Number of CPUs configured =     %lu\n",(unsigned long) sysconf(_SC_NPROCESSORS_CONF));
+  printf("Number of CPUs online =         %lu\n",(unsigned long) sysconf(_SC_NPROCESSORS_ONLN));
 
   printf("Page size =                     %lu\n",(unsigned long) sysconf(_SC_PAGESIZE));
 
   getrlimit (RLIMIT_AS, &rlp);
-  printf ("Soft limit on virtual process size = %lu MB\n", (unsigned long) rlp.rlim_cur / onemb);
-  printf ("Hard limit on virtual process size = %lu MB\n", (unsigned long) rlp.rlim_max / onemb);
+  printf ("Soft limit on virtual process size = %lu GB\n", (unsigned long) rlp.rlim_cur / onegb);
+  printf ("Hard limit on virtual process size = %lu GB\n", (unsigned long) rlp.rlim_max / onegb);
 	     
   if ( getrlimit (RLIMIT_CORE, &rlp) != 0) {
     printf ("Bad return from getrlimit\n");
     exit (1);
   }
-  printf ("Soft limit on max core filesize = %lu MB\n", (unsigned long) rlp.rlim_cur / onemb);
-  printf ("Hard limit on max core filesize = %lu MB\n", (unsigned long) rlp.rlim_max / onemb);
+  printf ("Soft limit on max core filesize = %lu GB\n", (unsigned long) rlp.rlim_cur / onegb);
+  printf ("Hard limit on max core filesize = %lu GB\n", (unsigned long) rlp.rlim_max / onegb);
 
   getrlimit (RLIMIT_CPU, &rlp);
   printf ("Soft limit on max CPU usage     = %lu \n", (unsigned long) rlp.rlim_cur);
   
   getrlimit (RLIMIT_DATA, &rlp);
-  printf ("Soft limit on max HEAP usage    = %lu MB\n", (unsigned long) rlp.rlim_cur / onemb);
-  printf ("Hard limit on max HEAP usage    = %lu MB\n", (unsigned long) rlp.rlim_max / onemb);
+  printf ("Soft limit on max HEAP usage    = %lu GB\n", (unsigned long) rlp.rlim_cur / onegb);
+  printf ("Hard limit on max HEAP usage    = %lu GB\n", (unsigned long) rlp.rlim_max / onegb);
   
   getrlimit (RLIMIT_FSIZE, &rlp);
-  printf ("Soft limit on max file size     = %lu MB\n", (unsigned long) rlp.rlim_cur / onemb);
-  printf ("Hard limit on max file size     = %lu MB\n", (unsigned long) rlp.rlim_max / onemb);
+  printf ("Soft limit on max file size     = %lu GB\n", (unsigned long) rlp.rlim_cur / onegb);
+  printf ("Hard limit on max file size     = %lu GB\n", (unsigned long) rlp.rlim_max / onegb);
   
   getrlimit (RLIMIT_STACK, &rlp);
-  printf ("Soft limit on max stack size    = %lu MB\n", (unsigned long) rlp.rlim_cur / onemb);
-  printf ("Hard limit on max stack size    = %lu MB\n", (unsigned long) rlp.rlim_max / onemb);
+  printf ("Soft limit on max stack size    = %lu GB\n", (unsigned long) rlp.rlim_cur / onegb);
+  printf ("Hard limit on max stack size    = %lu GB\n", (unsigned long) rlp.rlim_max / onegb);
 
 #if ( defined SGI )
   getrlimit (RLIMIT_RSS, &rlp);
-  printf ("Soft limit on max RSS           = %lu MB\n", (unsigned long) rlp.rlim_cur / onemb);
-  printf ("Hard limit on max RSS           = %lu MB\n", (unsigned long) rlp.rlim_max / onemb);
+  printf ("Soft limit on max RSS           = %lu GB\n", (unsigned long) rlp.rlim_cur / onegb);
+  printf ("Hard limit on max RSS           = %lu GB\n", (unsigned long) rlp.rlim_max / onegb);
   getrlimit (RLIMIT_VMEM, &rlp);
-  printf ("Soft limit on max virtual memory= %lu MB\n", (unsigned long) rlp.rlim_cur / onemb);
-  printf ("Hard limit on max virtual memory= %lu MB\n", (unsigned long) rlp.rlim_max / onemb);
+  printf ("Soft limit on max virtual memory= %lu GB\n", (unsigned long) rlp.rlim_cur / onegb);
+  printf ("Hard limit on max virtual memory= %lu GB\n", (unsigned long) rlp.rlim_max / onegb);
 #endif
 
   ret = getrusage (RUSAGE_SELF, &usage);
@@ -121,7 +107,7 @@ main(int argc, char **argv)
       free (stuff);
     }
     mbytes = nbytes/1.1e6;
-    printf ("Max mallocable memory = %d MB within 10%%\n", mbytes);
+    printf ("Max mallocable memory = %d GB within 10%%\n", mbytes / 1024);
   }
 
   exit(0);
