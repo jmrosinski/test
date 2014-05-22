@@ -14,19 +14,19 @@ static char *cpuset_to_cstr(cpu_set_t *mask, char *str)
   char *ptr = str;
   int i, j, entry_made = 0;
   for (i = 0; i < CPU_SETSIZE; i++) {
-    if (CPU_ISSET(i, mask)) {
+    if (CPU_ISSET(i, mask)) {  // this thread/task can run on core i
       int run = 0;
       entry_made = 1;
-      for (j = i + 1; j < CPU_SETSIZE; j++) {
+      for (j = i + 1; j < CPU_SETSIZE; j++) { 
         if (CPU_ISSET(j, mask)) run++;
         else break;
       }
-      if (!run)
+      if (!run)                 // run=0 means cannot run on any subsequent cores
         sprintf(ptr, "%d,", i);
-      else if (run == 1) {
+      else if (run == 1) {      // run=1 means just core i and i+1 are runnable
         sprintf(ptr, "%d,%d,", i, i + 1);
         i++;
-      } else {
+      } else {                  // run>1 means there's a range of runnable cores
         sprintf(ptr, "%d-%d,", i, i + run);
         i += run;
       }
@@ -69,6 +69,7 @@ int main(int argc, char *argv[])
 #pragma omp parallel private(thread, coremask, clbuf)
   {
     thread = omp_get_thread_num();
+    //JR Passing zero means use the calling process
     (void)sched_getaffinity(0, sizeof(coremask), &coremask);
     cpuset_to_cstr(&coremask, clbuf);
     #pragma omp barrier
