@@ -1,9 +1,11 @@
-// Need to define _GNU_SOURCE sometimes to get value of CPU_SETSIZE
+// Define _GNU_SOURCE guarantees CPU_SETSIZE is defined
+// Likewise for CPU_ZERO and CPU_SET
 #define _GNU_SOURCE
 
 #include <stdio.h>
 #include <unistd.h>  // gethostname, getopt
 #include <sched.h>
+#include <mpi.h>
 #include <omp.h>
 
 extern void runnable (cpu_set_t *, int *, int *);
@@ -22,6 +24,10 @@ int main (int argc, char **argv)
   int spin = 0; // for spinning: default is do not
 
   (void) gethostname (hnbuf, sizeof (hnbuf));
+
+  MPI_Init (&argc, &argv);
+  MPI_Comm_rank (MPI_COMM_WORLD, &rank);
+
 #pragma omp parallel private (thread, setmask, getmask, lo, hi)
   {
     thread = omp_get_thread_num ();
@@ -41,5 +47,6 @@ int main (int argc, char **argv)
     if (spin)
       while (1);
   }
+  MPI_Finalize ();
   return 0;
 }
