@@ -1,9 +1,9 @@
-FC = ifort
-OMPFLAG = -openmp
+FC = ftn
+OMPFLAG = -homp
 # Set THREADSAFEFLAG=-recursive to fix problem
-THREADSAFEFLAG = -openmp
+THREADSAFEFLAG =
 FFLAGS = $(OMPFLAG)
-CC = icc
+CC = cc
 LDFLAGS =  $(OMPFLAG)
 OBJS = main.o sub.o print_address.o
 
