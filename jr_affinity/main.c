@@ -14,24 +14,45 @@ int main (int argc, char **argv)
   int lo;
   int hi;
   cpu_set_t coremask;
+  int ret;
 
-  int c;        // for spinning
-  int spin = 0; // for spinning: default is do not
+  int c;                    // for spinning
+  int spin = 0;             // for spinning: default is do not
+  int timework = 0;         // time a fixed amount of work
+  const int totiter = 1024; // total iterations for all tasks
+  int niter;                // number of iterations for this task
+  float results[niter];     // results returned from dowork
+  int nranks;               // size of MPI_COMM_WORLD
 
-  MPI_Init (&argc, &argv);
-  MPI_Comm_rank (MPI_COMM_WORLD, &rank);
+  void dowork (const int, float *);
+
+  if ((ret = MPI_Init (&argc, &argv)) != 0) {
+    printf ("MPI_Init failed\n");
+    return -1;
+  }
+
+  (void) MPI_Comm_rank (MPI_COMM_WORLD, &rank);
+  (void) MPI_Comm_size (MPI_COMM_WORLD, &nranks);
 
   // begin additions for spinning
-  while ((c = getopt (argc, argv, "s")) != -1) {
+  while ((c = getopt (argc, argv, "sw")) != -1) {
     switch (c) {
     case 's':
       spin = 1;
       break;
+    case 'w':
+      timework = 1;
+      break;
     default:
       printf ("unknown option %c\n", c);
-      return 1;
+      (void) MPI_Abort (MPI_COMM_WORLD, 1);
       break;
     }
+  }
+
+  if (spin && timework) {
+    printf ("spin and timework may not both be true\n");
+    (void) MPI_Abort (MPI_COMM_WORLD, 1);
   }
 
   (void) gethostname (hnbuf, sizeof (hnbuf));
@@ -48,6 +69,16 @@ int main (int argc, char **argv)
     if (spin)
       while (1);
   }
+
+  if (timework) {
+    if (totiter % nranks != 0) {
+      printf ("nranks=%d needs to divide evenly into totiter=%d\n", nranks, totiter);
+      (void) MPI_Abort (MPI_COMM_WORLD, 1);
+    }
+    niter = totiter / nranks;
+    dowork (niter, results);
+  }
+
   MPI_Finalize ();
   return 0;
 }

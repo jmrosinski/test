@@ -1,8 +1,9 @@
+GPTL = /usr/local/gptl-v5.4.4
 CC = mpicc
 OMPFLAG = -fopenmp
-CFLAGS = -g -O2 $(OMPFLAG)
-LDFLAGS = $(OMPFLAG)
-OBJS1 = main.o runnable.o
+CFLAGS = -g -O0 $(OMPFLAG) -I$(GPTL)/include
+LDFLAGS = $(OMPFLAG) -L$(GPTL)/lib -lgptl -lm
+OBJS1 = main.o dowork.o runnable.o
 OBJS2 = setaff.o runnable.o
 
 all: a.out setaff
