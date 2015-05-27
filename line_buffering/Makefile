@@ -1,5 +1,5 @@
-FC = gfortran
-CC = gcc
+FC = ifort
+CC = icc
 OBJS = fmain.o linebuf_stdout.o
 
 %.o: %.F90

@@ -68,4 +68,11 @@ begin
   gsn_define_colormap(wks,"gui_default")
   res@cnMaxLevelCount      = 5            ; number of contour levels
   map = gsn_csm_contour_map(wks,ts2d,res)
+
+  ts2d = f->wZZZ(0,3,:)          ; select the 1st time and lvl idxs of the field "wZZZ"
+  res@tiMainString         = "area normalized to smallest"
+  res@cnMaxLevelCount      = 256            ; number of contour levels
+  gsn_define_colormap(wks,"NCV_banded")
+  map = gsn_csm_contour_map(wks,ts2d,res)
+
 end

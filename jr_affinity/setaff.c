@@ -28,7 +28,7 @@ int main (int argc, char **argv)
   MPI_Init (&argc, &argv);
   MPI_Comm_rank (MPI_COMM_WORLD, &rank);
 
-  printf ("%s: Attempting to set affinity for rank=%d\n", rank);
+  printf ("%s: Attempting to set affinity for rank=%d\n", argv[0], rank);
 #pragma omp parallel private (thread, setmask, getmask, lo, hi)
   {
     thread = omp_get_thread_num ();
