@@ -1,5 +1,5 @@
 #!/bin/csh
-set mpiruncmd = "mpirun -n 2"
+set mpiruncmd = "mpiexec -np 2"
 set cmd = "$mpiruncmd ENVVAR=GOTIT ./a.out"
 echo "Testing via $cmd ..."
 $cmd

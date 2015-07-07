@@ -1,17 +1,14 @@
 FC = ifort
+CC = icc
+CFLAGS = 
 FFLAGS = -O2
 OMPFLAG = -openmp
 
-all: heap stack threadstack
+#all: heap stack threadstack
+all: heap
 
 heap: heap.c
-	$(CC) -o $@ $<
-
-stack: stack.f90
-	$(FC) $(FFLAGS) -o $@ $<
-
-threadstack: threadstack.f90
-	$(FC) $(FFLAGS) $(OMPFLAG) -o $@ $<
+	$(CC) -o $@ $(CFLAGS) $<
 
 clean:
-	$(RM) heap stack threadstack *.o
+	$(RM) heap *.o

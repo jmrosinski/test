@@ -11,9 +11,11 @@ int main ()
   for (nbytes = 1000*mb; ;nbytes *= 1.1) {
     printf ("malloc asking for %f GB...\n", nbytes/(1024.*mb));
     if (arr = (char *) malloc (nbytes)) {
-      printf ("malloc succeeded, now memset...\n");
+      (void) printf ("malloc succeeded, now memset...\n");
+      (void) fflush (stdout);
       memset (arr, 0, nbytes);
       printf ("Success\n");
+      (void) fflush (stdout);
       free (arr);
     } else {
       printf ("malloc failed. quitting.\n");

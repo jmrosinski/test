@@ -8,11 +8,16 @@ int main (int argc, char **argv)
   int iam;
   int ret;
   int retcode;
+  int resultlen;
   char *val;
+  char nodename[128];
 
   ret = MPI_Init (&argc, &argv);
   ret = MPI_Comm_size (MPI_COMM_WORLD, &nranks);
   ret = MPI_Comm_rank (MPI_COMM_WORLD, &iam);
+  ret = MPI_Get_processor_name (nodename, &resultlen);
+
+  printf ("MPI rank %d is running on node=%s\n", iam, nodename);
 
   if (val = getenv ("ENVVAR")) {
     retcode = 0;
