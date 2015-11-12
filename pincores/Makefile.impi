@@ -1,0 +1,15 @@
+FC = mpiifort
+CC = gcc
+CFLAGS = $(OMPFLAG)
+OMPFLAG = -openmp
+
+OBJS = main.o runnable.o print_affinity.o set_affinity.o
+
+a.out: $(OBJS)
+	$(FC) -o $@ $(OBJS) $(OMPFLAG)
+
+%.o: %.F90
+	$(FC) -c $<
+
+clean:
+	$(RM) $(OBJS) a.out
