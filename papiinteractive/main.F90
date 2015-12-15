@@ -3,7 +3,7 @@ program main
   implicit none
 
   integer, parameter :: maxelem = 1000000
-  real :: a(maxelem), b(maxelem)
+  real, allocatable :: a(:,:), b(:,:)
   integer :: ncounter = 0
   integer :: ret
   character(len=32) :: counter
@@ -34,9 +34,9 @@ program main
     else
       write(6,*)'Counter not found for ',trim(counter)
     end if
-    write(6,*)'Enter <CR> to enable more counters, anything else when done'
+    write(6,*)'Enter "d" when done, any other letter to enable more counters'
     read(5,*) ans
-    done = ans /= ' '
+    done = ans == 'd'
   end do
 
   write(6,*)'Enter number of threads or <CR> for no threading'
@@ -44,13 +44,15 @@ program main
   ret = omp_set_num_threads (nthreads)
   ret = gptlinitialize ()
 
-  a(:) = .1
-  b(:) = .2
+  allocate(a(maxelem,nthreads))
+  allocate(b(maxelem,nthreads))
+  a(:,:) = .1
+  b(:,:) = .2
 
-!$OMP PARALLEL DO FIRSTPRIVATE(a,b)
+!$OMP PARALLEL DO PRIVATE(ret)
   do n=1,nthreads
     ret = gptlstart('sub')
-    call sub (a, b, maxelem)
+    call sub (a(1,n), b(1,n), maxelem)
     ret = gptlstop('sub')
   end do
 

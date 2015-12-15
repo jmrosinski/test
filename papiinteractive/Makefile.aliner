@@ -9,8 +9,7 @@ OBJS = main.o sub.o
 	$(FC) -c $(FFLAGS) -I$(GPTL) $<
 
 a.out: $(OBJS)
-	$(FC) -o $@ $(FFLAGS) $? -L$(GPTL) -lgptl -L$(PAPI) -lpapi
+	$(FC) -o $@ $(FFLAGS) $^ -L$(GPTL) -lgptl -L$(PAPI) -lpapi
 
 clean:
 	$(RM) *.o a.out
-

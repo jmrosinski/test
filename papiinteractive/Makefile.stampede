@@ -1,0 +1,15 @@
+FC = mpiifort
+OMPFLAG = -openmp
+FFLAGS = $(OMPFLAG) -g -O2
+GPTL = $(HOME)/gptl-v5.4.4_papi
+OBJS = main.o sub.o
+
+%.o: %.F90
+	$(FC) -c $(FFLAGS) -I$(GPTL)/include $<
+
+a.out: $(OBJS)
+	$(FC) -o $@ $(FFLAGS) $^ -L$(GPTL)/lib -lgptl -L$(TACC_PAPI_LIB) -lpapi
+
+clean:
+	$(RM) *.o a.out
+
