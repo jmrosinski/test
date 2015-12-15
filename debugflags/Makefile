@@ -4,8 +4,9 @@ ifeq ($(FC),gfortran)
 endif
 
 ifeq ($(FC),ifort)
-  FFLAGS = 
+  FFLAGS = -traceback -g -check bounds,pointers,uninit -init=arrays,snan -fpe0
 endif
+
 OBJS = main.o problems.o
 
 a.out: $(OBJS)
@@ -18,4 +19,3 @@ clean:
 	$(FC) -c $(FFLAGS) $<
 
 main.o: problems.o
-

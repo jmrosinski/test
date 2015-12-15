@@ -1,10 +1,16 @@
 FC = gfortran
 OMPFLAG = -fopenmp
-FFLAGS = $(OMPFLAG) -O3
+FFLAGS = $(OMPFLAG) -g -O0
+GPTL = /home/rosinski/gptl_v5.4.5
+PAPI = /usr/lib/x86_64-linux-gnu
+OBJS = main.o sub.o
 
-a.out: main.F90
-	$(FC) -o $@ $(FFLAGS) $<
+%.o: %.F90
+	$(FC) -c $(FFLAGS) -I$(GPTL) $<
+
+a.out: $(OBJS)
+	$(FC) -o $@ $(FFLAGS) $? -L$(GPTL) -lgptl -L$(PAPI) -lpapi
 
 clean:
-	$(RM) *.o
+	$(RM) *.o a.out
 

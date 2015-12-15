@@ -1,5 +1,4 @@
 program main
-  use omp
   use gptl
   implicit none
 
@@ -8,20 +7,26 @@ program main
   integer :: ncounter = 0
   integer :: ret
   character(len=32) :: counter
+  character(len=32) :: countersave(9)
   integer :: icounter
   logical :: done = .false.
   integer :: nthreads
+  integer :: n, t
+  character(len=1) :: ans
+  real*8 :: val
+
+  integer, external :: omp_set_num_threads
   
   do while (.not. done)
     write(6,*)'Enter GPTL or PAPI counter to enable'
     read(5,*) counter
-    ret = gptl_papi_event_name_to_code (trim(counter), icounter)
+    ret = gptlevent_name_to_code (trim(counter), icounter)
     if (ret == 0) then
       write(6,*)'counter for ',trim(counter),' =',icounter
-      ret = gptlenable (icounter, 1)
+      ret = gptlsetoption (icounter, 1)
       if (ret == 0) then
         write(6,*)'Successfully enabled counter=',trim(counter)
-        n = n + 1
+        ncounter = ncounter + 1
         countersave(ncounter) = counter
       else
         write(6,*)'Failed to enable counter=',trim(counter)
@@ -31,7 +36,7 @@ program main
     end if
     write(6,*)'Enter <CR> to enable more counters, anything else when done'
     read(5,*) ans
-    done = ans == ' '
+    done = ans /= ' '
   end do
 
   write(6,*)'Enter number of threads or <CR> for no threading'
@@ -45,19 +50,20 @@ program main
 !$OMP PARALLEL DO FIRSTPRIVATE(a,b)
   do n=1,nthreads
     ret = gptlstart('sub')
-    call sub (a, b)
+    call sub (a, b, maxelem)
     ret = gptlstop('sub')
   end do
 
-  ret = gptlget_eventvalue ('sub', 
+  do n=1,ncounter
+    do t=0,nthreads-1
+      if (gptlget_eventvalue ('sub', trim(countersave(n)), t, val) == 0) then
+        write(6,*)'thread=',t,' counter=',trim(countersave(n)),' val=', val
+      else
+        write(6,*)'thread=',t,' Failure from gptlget_eventvalue for counter=',trim(countersave(t))
+      end if
+    end do
+  end do
+  write(6,*)'calling gptlpr'
+  ret = gptlpr (0)
 end program main
 
-subroutine sub (a, b, maxelem)
-  integer, intent(in) :: maxelem
-  real, intent(inout) :: a(maxelem)
-  real, intent(inout) :: b(maxelem)
-  real :: sum(maxelem)
-
-  a(:) = 2.1 + 3.3*a(:)
-  b(:) = 5.5 + 2.2*b(:)
-end subroutine sub

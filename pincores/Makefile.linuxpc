@@ -9,7 +9,7 @@ a.out: $(OBJS)
 	$(FC) -o $@ $(OBJS) $(OMPFLAG)
 
 %.o: %.F90
-	$(FC) -c $<
+	$(FC) -c $(OMPFLAG) $<
 
 clean:
 	$(RM) $(OBJS) a.out
