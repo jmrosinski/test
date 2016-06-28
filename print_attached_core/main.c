@@ -11,8 +11,9 @@ int shiftiam;  // for shifting affinity
 int nranks;
 int pid;       // process id
 int nthreads;
-int shiftintvl = 10;    // wait this long before forcing affinity shift (default 10 seconds)
-volatile int *core;     // array of attached cores
+int shiftintvl = 10;      // wait this long before forcing affinity shift (default 10 seconds)
+volatile int *core;       // array of attached cores
+volatile char *status;     // array of nthreads statuses
 extern void init_core (int);
 extern void threaded_loop (void);
 extern void print_whos_running_where (FILE *, int);
@@ -33,7 +34,8 @@ int main (int argc, char **argv)
 
   pid = getpid ();
   nthreads = omp_get_max_threads ();
-  core = malloc (nthreads * sizeof (int));
+  core   = malloc (nthreads * sizeof (int));
+  status = malloc (nthreads * sizeof (char));
   init_core (nthreads);
 
   while ((c = getopt (argc, argv, "hcrn:w:")) != -1) {
@@ -134,17 +136,21 @@ void threaded_loop ()
 
 void print_whos_running_where (FILE *fp, int mythread)
 {
-  char status;
+  char newstatus;
   int newcore;
 
   rewind (fp);
   fscanf (fp, "%*d %*s %c %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld "
         	         "%*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld "
 	                 "%*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld "
-	                 "%*ld %*ld %*ld %*ld %*ld %d %*d %*d %*d %*d %*d", &status, &newcore);
+	                 "%*ld %*ld %*ld %*ld %*ld %d %*d %*d %*d %*d %*d", &newstatus, &newcore);
   if (newcore != core[mythread]) {
-    printf ("iam=%d thread=%d status=%c core=%d\n", iam, mythread, status, newcore);
+    printf ("CORE CHANGE: iam=%d thread=%d core=%d\n", iam, mythread, newcore);
     core[mythread] = newcore;
+  }
+  if (newstatus != status[mythread]) {
+    printf ("STATUS CHANGE: iam=%d thread=%d status=%c\n", iam, mythread, newstatus);
+    status[mythread] = newstatus;
   }
 }
 
@@ -152,6 +158,8 @@ void init_core (int nthreads)
 {
   int n;
 
-  for (n = 0; n < nthreads; ++n)
+  for (n = 0; n < nthreads; ++n) {
     core[n] = -1;
+    status[n] = -1;
+  }
 }
