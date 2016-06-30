@@ -12,16 +12,20 @@ int nranks;
 int pid;       // process id
 int nthreads;
 int shiftintvl = 10;      // wait this long before forcing affinity shift (default 10 seconds)
-volatile int *core;       // array of attached cores
-volatile char *status;     // array of nthreads statuses
+int *core;       // array of attached cores
+char *status;    // array of nthreads statuses
+volatile int *tidarr;     // array of tids
+FILE **fp;       // array of file pointers into /proc
+
+extern void fill_tid_fp (void);
 extern void init_core (int);
 extern void threaded_loop (void);
-extern void print_whos_running_where (FILE *, int);
+extern void print_any_changes (void);
+extern void print_all_statuses (void);
 
 int main (int argc, char **argv)
 {
   int ret;
-  FILE *fp;
   int c;
   int pin2core = 0;    // 1=> pin threads to single core
   int pin2range = 0;   // 1=> pin threads to range of cores
@@ -36,6 +40,8 @@ int main (int argc, char **argv)
   nthreads = omp_get_max_threads ();
   core   = malloc (nthreads * sizeof (int));
   status = malloc (nthreads * sizeof (char));
+  tidarr = malloc (nthreads * sizeof (int));
+  fp     = malloc (nthreads * sizeof (FILE *));
   init_core (nthreads);
 
   while ((c = getopt (argc, argv, "hcrn:w:")) != -1) {
@@ -83,10 +89,12 @@ int main (int argc, char **argv)
       printf ("No pinning\n");
     }
   }
+
   ret = print_affinity_ (&iam);
+  fill_tid_fp ();
 
   while (1) {
-    // Loop for 1 second and print when attachment changes
+    // Loop for some time (default 10 seconds), printing any core attachment changes
     threaded_loop ();
     // Change affinity to guarantee all is working as expected
     if (pin2core || pin2range) {
@@ -95,23 +103,18 @@ int main (int argc, char **argv)
       ret = set_affinity_ (&shiftiam, &cpn, &nthreads, &pin2core);
     }
     ret = print_affinity_ (&iam);
+    print_all_statuses ();
   }
 }
 
-void threaded_loop ()
+void fill_tid_fp ()
 {
   int n;
-  int iter;
-  int ret;
   int tid;
   int mythread;
-  static const int usleeptime = 100000;
-  int niter = ((unsigned long) shiftintvl * 1000000) / usleeptime;
   char path[64];
-  FILE *fp;
 
-  // Loop for shiftintvl seconds and print out if any affinities change
-#pragma omp parallel for private (fp, path, tid, mythread)
+#pragma omp parallel for private (mythread, tid)
   for (n = 0; n < nthreads; ++n) {
     mythread = omp_get_thread_num ();
 #ifdef SYS_gettid
@@ -119,39 +122,81 @@ void threaded_loop ()
 #else
 #error "SYS_gettid unavailable on this system"
 #endif
+    tidarr[mythread] = tid;
+  }
 
-    sprintf (path, "/proc/%d/task/%d/stat", pid, tid);
-    fp = fopen (path, "r");
-      
-    for (iter = 0; iter < niter; ++iter) {
-      print_whos_running_where (fp, mythread);
-      usleep (usleeptime);
-    }
-    if (fclose (fp)) {
-      printf ("Failed to close path=%s\n", path);
-      ret = MPI_Abort (MPI_COMM_WORLD, -1);
+  // Master opens and reads the status from /proc
+  if (omp_get_thread_num () == 0) {
+    for (n = 0; n < nthreads; ++n) {
+      sprintf (path, "/proc/%d/task/%d/stat", pid, tidarr[n]);
+      fp[n] = fopen (path, "r");
     }
   }
 }
 
-void print_whos_running_where (FILE *fp, int mythread)
+void threaded_loop ()
+{
+  int n;
+  int iter;
+  int mythread;
+  static const int usleeptime = 100000;
+  int niter = ((unsigned long) shiftintvl * 1000000) / usleeptime;
+
+  // Loop for shiftintvl seconds and print out if any affinities change
+#pragma omp parallel for private (mythread)
+  for (n = 0; n < nthreads; ++n) {
+    mythread = omp_get_thread_num ();
+
+    for (iter = 0; iter < niter; ++iter) {
+      if (mythread == 0)
+	print_any_changes ();
+
+      usleep (usleeptime);
+    }
+  }
+}
+
+void print_any_changes ()
 {
   char newstatus;
   int newcore;
+  int n;
 
-  rewind (fp);
-  fscanf (fp, "%*d %*s %c %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld "
-        	         "%*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld "
-	                 "%*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld "
-	                 "%*ld %*ld %*ld %*ld %*ld %d %*d %*d %*d %*d %*d", &newstatus, &newcore);
-  if (newcore != core[mythread]) {
-    printf ("CORE CHANGE: iam=%d thread=%d core=%d\n", iam, mythread, newcore);
-    core[mythread] = newcore;
+  for (n = 0; n < nthreads; ++n) {
+    rewind (fp[n]);
+    fscanf (fp[n], "%*d %*s %c %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld "
+        	              "%*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld "
+	                      "%*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld "
+	                      "%*ld %*ld %*ld %*ld %*ld %d %*d %*d %*d %*d %*d", 
+	    &newstatus, &newcore);
+    if (newcore != core[n]) {
+      printf ("CORE CHANGE: iam=%d thread=%d core=%d\n", iam, n, newcore);
+      core[n] = newcore;
+    }
+    if (newstatus != status[n]) {
+      printf ("STATUS CHANGE: iam=%d thread=%d status=%c\n", iam, n, newstatus);
+      status[n] = newstatus;
+    }
   }
-  if (newstatus != status[mythread]) {
-    printf ("STATUS CHANGE: iam=%d thread=%d status=%c\n", iam, mythread, newstatus);
-    status[mythread] = newstatus;
+}
+
+void print_all_statuses ()
+{
+  char newstatus;
+  int newcore;
+  int n;
+
+  for (n = 0; n < nthreads; ++n) {
+    rewind (fp[n]);
+    fscanf (fp[n], "%*d %*s %c %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld "
+        	              "%*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld "
+	                      "%*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld %*ld "
+	                      "%*ld %*ld %*ld %*ld %*ld %d %*d %*d %*d %*d %*d", 
+	    &newstatus, &newcore);
+    printf ("print_all_statuses: iam=%d thread=%d core=%d status=%c\n", 
+	    iam, n, newcore, newstatus);
   }
+  printf ("\n");
 }
 
 void init_core (int nthreads)
@@ -160,6 +205,7 @@ void init_core (int nthreads)
 
   for (n = 0; n < nthreads; ++n) {
     core[n] = -1;
-    status[n] = -1;
+    status[n] = 'x';
+    tidarr[n] = -1;
   }
 }
