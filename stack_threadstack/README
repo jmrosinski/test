@@ -1,0 +1,3 @@
+Purpose: Test available stack and threadstack memory
+To build: make -f <Makefile>
+To run: <mpiruncmd> -n <tasks> ./a.out [-t nthreads]

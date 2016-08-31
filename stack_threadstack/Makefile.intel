@@ -1,0 +1,10 @@
+CC = mpiicc
+OMPFLAG = -qopenmp
+CFLAGS = -O2 $(OMPFLAG)
+OBJS = main.o
+
+a.out: $(OBJS)
+	$(CC) -o $@ (OMPFLAG) $?
+
+clean:
+	$(RM) a.out $(OBJS)
