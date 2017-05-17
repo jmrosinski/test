@@ -2,16 +2,19 @@ OMP = yes
 FC = ifort
 ifeq ($(OMP),yes)
   ifeq ($(FC),ifort)
+    CC = icc
     OMPFLAG = -openmp
+    FFLAGS = $(OMPFLAG) -g -traceback
   else
+    CC = gcc
     OMPFLAG = -fopenmp
+    FFLAGS = $(OMPFLAG) -g -fbacktrace
   endif
 else
   OMPFLAG =
 endif
-FFLAGS = $(OMPFLAG) -g -traceback
 LDFLAGS = $(OMPFLAG)
-OBJS = fmain.o defs.o sub.o
+OBJS = fmain.o defs.o sub.o printaddr.o
 
 %.o: %.F90
 	$(FC) -c $(FFLAGS) $<
