@@ -1,0 +1,24 @@
+For all: For gdb to print line number info, compile routine(s) with -g
+
+GNU:
+Fortran main:
+  To stop on FPE: Must compile mprog with -ffpe-trap=invalid,zero,overflow
+  -rdynamic is NOT needed in LDFLAGS
+C main:
+  To print useful backtrace, i.e. include function names: LDFLAGS += -rdynamic
+
+Intel:
+Fortran main:
+  To stop on FPE: Compile with -fpe0
+  To print useful backtrace, compile with -traceback
+C main:
+  To print useful backtrace, LDFLAGS += -rdynamic
+  -fpe0 not mandatory to catch exception or print backtrace, but useful otherwise
+
+PGI:
+Forrtan main:
+  To stop on FPE: Compile with -Ktrap=fp
+C main:
+  To stop on FPE: Compile with -Ktrap=fp
+  To print useful backtrace, LDFLAGS += -rdynamic
+  
