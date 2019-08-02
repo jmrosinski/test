@@ -8,29 +8,34 @@ ifeq ($(TARGET),gnu)
   FFLAGS = -g
   FMAINFLAGS = $(FFLAGS) -ffpe-trap=invalid,zero,overflow
   LDFLAGS = -lm -rdynamic
-else
-  ifeq ($(TARGET),intel)
-    CXX = icpc
-    FC = ifort
-    CXXFLAGS =
-    CMAINFLAGS = $(CXXFLAGS)
+endif
+ifeq ($(TARGET),intel)
+  CXX = icpc
+  FC = ifort
+  CXXFLAGS =
+  CMAINFLAGS = $(CXXFLAGS)
 #    CFLAGS = -fp-trap=common
-    FFLAGS = -traceback
-    FMAINFLAGS = $(FFLAGS) -fpe0
-    LDFLAGS = -rdynamic
-  else
-    ifeq ($(TARGET),pgi)
-      CXX = pgc++
-      FC = pgfortran
-      CXXFLAGS =
-      CMAINFLAGS = $(CXXFLAGS)
-      FFLAGS =
-      FMAINFLAGS = $(FFLAGS) -Ktrap=fp
-      LDFLAGS = -rdynamic
-    else
-      echo "TARGET must be intel or gnu or pgi"
-    endif
-  endif
+  FFLAGS = -traceback
+  FMAINFLAGS = $(FFLAGS) -fpe0
+  LDFLAGS = -rdynamic
+endif
+ifeq ($(TARGET),pgi)
+  CXX = pgc++
+  FC = pgfortran
+  CXXFLAGS =
+  CMAINFLAGS = $(CXXFLAGS)
+  FFLAGS =
+  FMAINFLAGS = $(FFLAGS) -Ktrap=fp
+  LDFLAGS = -rdynamic
+endif
+ifeq ($(TARGET),clang)
+  CXX = clang
+  FC = gfortran
+  CXXFLAGS = -g
+  CMAINFLAGS = $(CXXFLAGS)
+  FFLAGS = -g
+  FMAINFLAGS = $(FFLAGS)  -ffpe-trap=invalid,zero,overflow
+  LDFLAGS = -rdynamic
 endif
 
 FOBJS = fmain.o fortfunc.o cfunc.o

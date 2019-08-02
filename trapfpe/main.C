@@ -3,6 +3,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#ifdef __APPLE__
+#include <xmmintrin.h>
+#endif
 
 extern "C" {
   float fortfunc_ (float *, float *);    // Fortran function generates FPE
@@ -31,7 +34,13 @@ int main ()
   struct sigaction sig_action = {};
   extern void handler (int, siginfo_t *, void *);                 // Signal handler
 
+#ifdef __APPLE__
+  _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+  _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_DIV_ZERO);
+  _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_OVERFLOW);
+#else
   ret = feenableexcept (FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
+#endif
 
   sig_action.sa_sigaction = handler;
   sigemptyset (&sig_action.sa_mask);
