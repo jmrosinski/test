@@ -1,11 +1,13 @@
-#include <fenv.h>
-#include <signal.h>
-#include <string.h>
-#include <stdio.h>
-#include <errno.h>
 #ifdef __APPLE__
-#include <xmmintrin.h>
+#include <xmmintrin.h> // Apple-specific signal handling
+#else
+#define _GNU_SOURCE
 #endif
+#include <fenv.h>    // feenableexcept
+#include <signal.h>  // sigaction
+#include <string.h>  // strerror
+#include <stdio.h>   // perror
+#include <errno.h>   // strerror(errno)
 
 extern "C" {
   float fortfunc_ (float *, float *);    // Fortran function generates FPE
@@ -31,8 +33,8 @@ int main ()
   int ans;
   char lang[2];
   int ret;
-  struct sigaction sig_action = {};
-  extern void handler (int, siginfo_t *, void *);                 // Signal handler
+  struct sigaction sig_action = {};               // passed to sigaction
+  extern void handler (int, siginfo_t *, void *); // Signal handler
 
 #ifdef __APPLE__
   _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
@@ -42,9 +44,10 @@ int main ()
   ret = feenableexcept (FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
 #endif
 
-  sig_action.sa_sigaction = handler;
-  sigemptyset (&sig_action.sa_mask);
-  sig_action.sa_flags = SA_SIGINFO | SA_ONSTACK;
+  sig_action.sa_flags = SA_SIGINFO;        // handler specified in sa_sigaction
+  sig_action.sa_sigaction = handler;       // function name
+  sigemptyset (&sig_action.sa_mask);       // initialize mask
+  sigaddset (&sig_action.sa_mask, SIGFPE); // disable another SIGFPE while one is being processed
 
   if (sigaction (SIGFPE,  &sig_action, NULL) != 0) {
     printf ("Call to sigaction failed: %s\n", strerror (errno));

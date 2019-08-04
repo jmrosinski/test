@@ -16,7 +16,7 @@ void handler (int sig, siginfo_t *info, void *ucontext) {
   case FPE_INTDIV:
     fprintf (stderr, "integer divide by zero\n");
     break;
-  case FPE_INTOVF:
+  case FPE_INTOVF:  // Cannot as yet get this one to trigger
     fprintf (stderr, "integer overflow)\n");
     break;
   case FPE_FLTDIV:
@@ -25,16 +25,10 @@ void handler (int sig, siginfo_t *info, void *ucontext) {
   case FPE_FLTOVF:
     fprintf (stderr, "floating-point overflow\n");
     break;
-  case FPE_FLTUND:
-    fprintf (stderr, "floating-point underflow\n");
-    break;
-  case FPE_FLTRES:
-    fprintf (stderr, "floating-point inexact result\n");
-    break;
   case FPE_FLTINV:
     fprintf (stderr, "floating-point invalid operation\n");
     break;
-  case FPE_FLTSUB:
+  case FPE_FLTSUB:  // Cannot as yet get this one to trigger
     fprintf (stderr, "subscript out of range\n");
     break;
   default:
