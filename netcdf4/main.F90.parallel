@@ -1,16 +1,20 @@
 program main
+  use mpi
   use netcdf
 
   implicit none
 
-  integer, parameter :: nx = 128
-  integer, parameter :: ny = 64
-  integer, parameter :: nz = 9
-  integer, parameter :: nt = 2   ! number of time periods
+  integer, parameter :: nx = 1024
+  integer, parameter :: ny = 512
+  integer, parameter :: nz = 38
+  integer, parameter :: nt = 1   ! number of time periods
 
   integer :: ret           ! return from MPI call
   integer :: ncid          ! netcdf file id
   integer :: mode_flag     ! creation flag for netcdf
+  integer :: iam           ! MPI rank
+  integer :: ntasks        ! number of MPI tasks
+  integer :: ntasksperpe   ! number of MPI tasks per pe
   integer :: dimids(4)     ! dimension ids for a variable
 ! dimension ids
   integer :: lon_dimid, lat_dimid, lev_dimid, time_dimid
@@ -32,13 +36,19 @@ program main
   real :: val(1)
   real, allocatable :: u(:,:,:) ! array holds data to be written
 
+  call mpi_init (ret)
+  call mpi_comm_rank (mpi_comm_world, iam, ret)
+  call mpi_comm_size (mpi_comm_world, ntasks, ret)
+
 !  mode_flag = ior (nf90_noclobber, nf90_hdf5)
   mode_flag = ior (nf90_clobber, nf90_netcdf4)
+! Tell the lib to use mpiio. Other option is nf90_posix. Either may work. Choose whichever is faster.
 ! See http://www.unidata.ucar.edu/support/help/MailArchives/netcdf/msg08863.html
 ! This only seems to work on my workstation (netcdf 4.1.3)
+!  mode_flag = ior (mode_flag, nf90_mpiposix)
 
 ! Create the netcdf file. After creation, it will be open in define mode
-  call handle_err (nf90_create ("test.nc", mode_flag, ncid))
+  call handle_err (nf90_create ("test.nc", mode_flag, ncid, comm=mpi_comm_world, info=mpi_info_null))
 ! Define dimensions
   call handle_err (nf90_def_dim (ncid, "lon", nx, lon_dimid))
   call handle_err (nf90_def_dim (ncid, "lat", ny, lat_dimid))
@@ -74,7 +84,7 @@ program main
   call handle_err (nf90_def_var (ncid, "u_wind", nf90_float, dimids, uid))
 !  call handle_err (nf90_def_var (ncid, "u_wind_compressed", nf90_float, dimids, uid_compressed, deflate_level=1))
 ! End define mode and enter data mode
-  call handle_err (nf90_enddef (ncid))
+!  call handle_err (nf90_enddef (ncid))
 
 ! Define and write dimension variables
   do i=1,nx
@@ -86,19 +96,26 @@ program main
   end do
 
   do k=1,nz
-    lev(k) = (k*1.013e5)/nz
+    lev(k) = (k/nz)*1.013e5
   end do
 
 ! Master task writes the dimension variables
-  call handle_err (nf90_put_var (ncid, lonid, lon))
-  call handle_err (nf90_put_var (ncid, latid, lat))
-  call handle_err (nf90_put_var (ncid, levid, lev))
+  if (iam == 0) then
+    call handle_err (nf90_put_var (ncid, lonid, lon))
+    call handle_err (nf90_put_var (ncid, latid, lat))
+    call handle_err (nf90_put_var (ncid, levid, lev))
+  end if
     
 ! Determine my portion of the data to write
-  startlat = 1
-  endlat = ny
+  if (mod (ny, ntasks) == 0) then
+    ntasksperpe = ny/ntasks
+  else
+    ntasksperpe = ny/ntasks + 1
+  end if
+  startlat = iam*ntasksperpe + 1
+  endlat = min (ny, startlat + ntasksperpe - 1)
   numlats = endlat - startlat + 1
-  write(6,*) ' startlat=', startlat, ' endlat=', endlat
+  write(6,*) 'iam ', iam, ' startlat=', startlat, ' endlat=', endlat
 
   allocate (u(nx,startlat:endlat,nz))
 
@@ -112,33 +129,41 @@ program main
       end do
     end do
 
-! Write time dimension var. Start at 0 days since ...
-    start(1) = n
-    count(1) = 1
-    val(1) = float(n-1)
-    call handle_err (nf90_put_var (ncid, timeid, val, start=start, count=count))
+! Master writes time dimension var. Start at 0 days since ...
+    if (iam == 0) then
+      start(1) = n
+      count(1) = 1
+      val(1) = float(n-1)
+      call handle_err (nf90_put_var (ncid, timeid, val, start=start, count=count))
+    end if
 
-    start = (/1 ,startlat,1 ,n/)
-    count = (/nx,numlats ,nz/)
+    start = (/1,startlat,1,n/)
+    count = (/nx,numlats,nz/)
 
     call handle_err (nf90_put_var (ncid, uid, u, start=start, count=count))
 !    call handle_err (nf90_put_var (ncid, uid_compressed, u, start=start, count=count))
   end do
 
   call handle_err (nf90_close (ncid))
-  stop 0
+  call mpi_finalize (ret)
+
+  stop
 end program main
 
 subroutine handle_err (code)
+  use mpi
   use netcdf
 
   implicit none
 
   integer, intent(in) :: code ! netcdf error code
+
   integer :: ret
 
   if (code /= nf90_noerr) then
     write(6,*) trim (nf90_strerror (code))
-    stop 999
+    call mpi_abort (mpi_comm_world, 1, ret)
   end if
+
+  return
 end subroutine handle_err
