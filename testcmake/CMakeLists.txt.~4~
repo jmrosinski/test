@@ -1,0 +1,37 @@
+cmake_minimum_required(VERSION 3.10)
+
+# set the project name
+project(simple)
+
+# Where to look for custom cmake modules
+set(CMAKE_MODULE_PATH "/home/rosinski/ecbuild/cmake/")
+
+# Where to look for libraries (better to do with "-DCMAKE_PREFIX_PATH=...")
+set(CMAKE_PREFIX_PATH "/home/rosinski/installdir/")
+
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+include(FindPkgConfig)
+pkg_search_module(GPTL REQUIRED gptl>=8.0.0)
+include(CMakePrintHelpers)
+cmake_print_variables(GPTL_FOUND)          #... set to 1 if module(s) exist
+cmake_print_variables(GPTL_LIBRARIES)      #... only the libraries (without the '-l')
+cmake_print_variables(GPTL_LINK_LIBRARIES) #... the libraries and their absolute paths
+cmake_print_variables(GPTL_LIBRARY_DIRS)   #... the paths of the libraries (without the '-L')
+cmake_print_variables(GPTL_LDFLAGS)        #... all required linker flags
+cmake_print_variables(GPTL_LDFLAGS_OTHER)  #... all other linker flags
+cmake_print_variables(GPTL_INCLUDE_DIRS)   #... the '-I' preprocessor flags (without the '-I')
+cmake_print_variables(GPTL_CFLAGS)         #... all required cflags
+cmake_print_variables(GPTL_CFLAGS_OTHER)   #... the other compiler flags
+cmake_print_variables(GPTL_INCLUDEDIR)
+
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+# add the executable
+add_executable(simple testgptl.cxx)
+
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+include_directories(${GPTL_INCLUDEDIR})
+cmake_print_variables(INCLUDE_DIRECTORIES)
+target_link_libraries(simple ${GPTL_LDFLAGS})
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+#ecbuild_append_to_rpath(${CMAKE_PREFIX_PATH})
