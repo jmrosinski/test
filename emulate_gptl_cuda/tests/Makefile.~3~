@@ -1,0 +1,14 @@
+include ../makefile.defs
+OBJS = cputest.o
+
+cputest: $(OBJS)
+	$(CC) -o $@ $(OBJS) -L../src -l$(LIBNAME)
+
+%.o: %.c
+	$(CC) $(CFLAGS) $<
+
+.PHONY: clean
+
+clean:
+	$(RM) $(OBJS)
+

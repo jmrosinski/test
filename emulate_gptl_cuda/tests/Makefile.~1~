@@ -1,0 +1,13 @@
+OBJS = gptl.o
+ARFLAGS = cr
+LIBNAME = gptl
+
+all: lib
+
+lib:
+	$(AR) $(ARFLAGS) lib$(LIBNAME).a $(OBJS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) $<
+
+.PHONY: all

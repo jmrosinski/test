@@ -1,0 +1,13 @@
+CC   = nvc
+FC   = nvfortran
+NVCC = nvcc
+
+# Order of subdirs matters
+SUBDIRS = src cuda cacc facc
+
+all: $(SUBDIRS)
+
+$(SUBDIRS):
+	$(MAKE) -C $@
+
+.PHONY: all $(SUBDIRS)

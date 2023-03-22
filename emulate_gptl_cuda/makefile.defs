@@ -1,0 +1,10 @@
+CC        = nvc
+CFLAGS    = -g
+FFLAGS    = -g
+FC        = nvfortran
+NVCC      = nvcc
+CUFLAGS   = -gencode arch=compute_61,code=compute_61 -g -G -lineinfo -src-in-ptx -ftz=true -rdc=true
+FACCFLAGS = -g -O0 -acc gpu -Minfo=accel -m64
+
+LIBNAME      = gptl
+LIBNAME_CUDA = gptl_cuda

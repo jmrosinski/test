@@ -1,0 +1,20 @@
+include ../makefile.defs
+COBJS   = gptl.o f_wrappers.o
+FOBJS   = gptlf.o
+OBJS    = $(COBJS) $(FOBJS)
+FFLAGS  = -g
+ARFLAGS = cr
+
+all: lib
+
+lib: $(OBJS)
+	$(AR) $(ARFLAGS) lib$(LIBNAME).a $(OBJS)
+
+.PHONY: all
+
+%.o: %.c
+	$(CC) -c $(CFLAGS) $<
+
+%.o: %.F90
+	$(FC) -c $(FFLAGS) $<
+
