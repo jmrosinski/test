@@ -5,13 +5,12 @@ program basic
   implicit none
 
   integer :: n, ret
+  integer :: zero = 0
 
   ret = gptlstart (0)
-!$acc parallel loop private(ret)
-  do n=0,0
-    ret = gptlstart_gpu (0)
-    ret = gptlstop_gpu (0)
-  end do
+!$acc parallel private(ret) copyin(zero)
+  ret = gptlstart_gpu (zero)
+  ret = gptlstop_gpu (zero)
 !$acc end parallel
   ret = gptlstop (0)
   ret = gptlcudadevsync ()
