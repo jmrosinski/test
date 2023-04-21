@@ -1,9 +1,0 @@
-include ../makefile.defs
-OBJS  = basic.o
-EXES  = $(basename $(OBJS))
-
-all: $(EXES)
-	$(FC) -o $@ $(FACCFLAGS) $(OBJS) -L../src -l$(LIBNAME) -L../cuda/src -l$(LIBNAME_CUDA)
-
-%.o: %.F90
-	$(FC) -c -o$@ -I../src -I../cuda/src $(FACCFLAGS) $<

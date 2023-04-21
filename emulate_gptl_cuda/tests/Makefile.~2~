@@ -1,9 +1,0 @@
-OBJS = cputest.o
-
-all: $(OBJS)
-	$(CC) -o $@ $(OBJS) -L../src -l$(LIBNAME)
-
-%.o: %.c
-	$(CC) $(CFLAGS) $<
-
-.PHONY: all

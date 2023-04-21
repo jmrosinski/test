@@ -1,9 +1,0 @@
-OBJS  = basic.o
-EXES  = $(basename $(OBJS))
-FACCFLAGS = "-acc gpu -Minfo=accel -m64"
-
-all: $(EXES)
-	$(FC) -o $@ $(FACCFLAGS) $(OBJS) -L../src -l$(LIBNAME) -L../cuda/src -l$(LIBNAME_CUDA)
-
-%.o: %.F90
-	$(FC) -c -o$@ $(FACCFLAGS)
