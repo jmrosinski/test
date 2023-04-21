@@ -1,4 +1,5 @@
 include ../makefile.defs
+CFLAGS += -I../src
 OBJS = cputest.o
 EXE  = $(basename $(OBJS))
 

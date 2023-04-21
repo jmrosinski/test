@@ -8,9 +8,11 @@ program basic
   integer :: zero = 0
 
   ret = gptlstart (0)
-!$acc parallel private(ret) copyin(zero)
-  ret = gptlstart_gpu (zero)
-  ret = gptlstop_gpu (zero)
+!$acc parallel private(ret) copyin(n)
+  do n=1,2
+    ret = gptlstart_gpu (n)
+    ret = gptlstop_gpu (n)
+  end do
 !$acc end parallel
   ret = gptlstop (0)
   ret = gptlcudadevsync ()

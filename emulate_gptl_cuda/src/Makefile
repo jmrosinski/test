@@ -1,5 +1,5 @@
 include ../makefile.defs
-COBJS   = f_wrappers.o
+COBJS   = gptl.o f_wrappers.o
 FOBJS   = gptlf.o
 OBJS    = $(COBJS) $(FOBJS)
 FFLAGS  = -g

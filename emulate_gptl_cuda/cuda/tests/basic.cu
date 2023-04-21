@@ -20,6 +20,6 @@ __global__ void runit (void)
   int ret;
   
   printf ("Entered global routine runit\n");
-  ret = GTLstart_gpu (0);
-  ret = GTLstop_gpu (1);
+  ret = GPTLstart_gpu (0);
+  ret = GPTLstop_gpu (1);
 }

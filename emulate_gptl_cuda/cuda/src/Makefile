@@ -4,24 +4,19 @@ FOBJS   = gptl_acc.o
 OBJS    = $(CUOBJS) $(FOBJS)
 ARFLAGS = cr
 
-%.o: %.cu
-	$(NVCC) -c $(CUFLAGS) $<
-#	$(NVCC) -c -dlink $(CUFLAGS) $<
+all: lib
 
-#	$(NVCC) -c $(CUFLAGS) $<
-#	$(NVCC) $(CUFLAGS) -dlink -o xxx.o $@
-#	mv xxx.o $@
+%.o: %.cu
+	$(NVCC) -c $< $(CUFLAGS)
 
 %.o: %.F90
-	$(FC) -c $(FACCFLAGS) $<
-
-all: lib
+	$(FC) -c $< $(FACCFLAGS)
 
 lib: $(OBJS)
 	$(AR) $(ARFLAGS) lib$(LIBNAME_CUDA).a $(OBJS)
+	ranlib lib$(LIBNAME_CUDA).a
 
 .PHONY: all clean
 
 clean:
 	$(RM) $(OBJS) lib$(LIBNAME_CUDA).a
-
