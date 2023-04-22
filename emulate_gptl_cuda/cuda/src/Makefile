@@ -13,10 +13,12 @@ all: lib
 	$(FC) -c $< $(FACCFLAGS)
 
 lib: $(OBJS)
+	$(NVCC) -arch=sm_61 -dlink $(OBJS) -o gpuCode.o
+# Only cacctests needs gpuCode.o. It will be linked directly w/o using the lib
 	$(AR) $(ARFLAGS) lib$(LIBNAME_CUDA).a $(OBJS)
 	ranlib lib$(LIBNAME_CUDA).a
 
 .PHONY: all clean
 
 clean:
-	$(RM) $(OBJS) lib$(LIBNAME_CUDA).a
+	$(RM) $(OBJS) gpuCode.o lib$(LIBNAME_CUDA).a
