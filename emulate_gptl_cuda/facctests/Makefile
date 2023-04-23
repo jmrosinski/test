@@ -9,5 +9,10 @@ $(EXE): $(OBJS)
 %.o: %.F90
 	$(FC) -c $< -I../src -I../cuda/src $(FACCFLAGS)
 
+.PHONY: check clean
+
+check: $(EXE)
+	./$(EXE)
+
 clean:
 	$(RM) $(OBJS) $(EXE)

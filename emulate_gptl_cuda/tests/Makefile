@@ -9,7 +9,10 @@ $(EXE): $(OBJS)
 %.o: %.c
 	$(CC) -c $(CFLAGS) $<
 
-.PHONY: clean
+.PHONY: check clean
+
+check: $(EXE)
+	./$(EXE)
 
 clean:
 	$(RM) $(OBJS) $(EXE)

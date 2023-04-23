@@ -10,5 +10,10 @@ $(EXE): $(OBJS)
 %.o: %.c
 	$(CC) -c $< -I../src -I../cuda/src $(CACCFLAGS)
 
+.PHONY: check clean
+
+check: $(EXE)
+	./$(EXE)
+
 clean:
 	$(RM) $(OBJS) $(EXE)
