@@ -1,10 +1,10 @@
 include ../makefile.defs
-FLDFLAGS = -Mcuda=cc61 -lstdc++
+LDFLAGS  = $(FACCFLAGS) -L../src -l$(LIBNAME) -L../cuda/src -l$(LIBNAME_CUDA)
 OBJS     = basic.o
 EXE      = $(basename $(OBJS))
 
 $(EXE): $(OBJS)
-	$(FC) -o $@ $(OBJS) $(FACCFLAGS) $(FLDFLAGS) -L../src -l$(LIBNAME) -L../cuda/src -l$(LIBNAME_CUDA)
+	$(FC) -o $@ $(OBJS) $(LDFLAGS)
 
 %.o: %.F90
 	$(FC) -c $< -I../src -I../cuda/src $(FACCFLAGS)
