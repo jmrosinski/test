@@ -1,0 +1,7 @@
+These sources in facctests/ are not built, nor were they built when they were part of the
+GPTL facctests/ directory. Perhaps they can just be deleted?
+
+persist.F90
+persist_mpi.F90
+driver_mpi.F90
+driver_serial.F90
