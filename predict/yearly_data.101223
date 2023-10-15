@@ -1,0 +1,26 @@
+INPUTS:
+start_mo column is for the START of that month
+end_mo column is for the END of that month
+
+OUTPUTS:
+*_value (thousands) columns come from ../../NOTES.*
+"spent" (K dollars) comes from running "spent expenses.<year>.txt" in ../expenditures
+  It is $ spent from start_mo to end_mo of that year
+"mo_annuity_income" is monthly lifetime annuity income (K dollars) and is currently just UCAR.
+   Could add Social Security? But so far I'm ignoring that.
+Inflation is % from start_mo through end_mo and is derived from
+ www.statbureau.org/en/united-states/cpi-u
+ Calculate as (end_cpi - start_cpi) / start_cpi
+NOTE: year 2023 started UCAR annuity in September, which zeroed the accumulation at TIAA. So,
+ changed start_assets to subtract the $306K that disappeared from the accumulation when the annuity
+ started. On 10/12/2023 modified predict.c to read in the monthly annuity value, and include its
+ current value in the calculation of "ramp to zero". Verified that prior year computations remained
+ the same with the new code (as it should be since mo_annuity_income is zero for all those years)
+
+
+year  start_mo  start_cpi  start_assets  end_mo  end_cpi  end_assets  spent	mo_annuity_income
+2019  1		251.712	   ?		 12	 256.974  ?		 ?	0.
+2020  4	       	257.971	   2439	  	 12      260.474  2992	 	 100.	0.
+2021  1	       	261.582	   2992	  	 12      278.802  3264	 	 67.585	0.
+2022  1		281.148	   3264		 12	 296.797  2844		 86.299	0.
+2023  1		299.170	   2538		 9	 307.789  2724		 39.574	2.515
