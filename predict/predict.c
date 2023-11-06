@@ -2,6 +2,7 @@
 #include <stdlib.h>  // malloc, free
 #include <ctype.h>   // atoi
 #include <string.h>  // memset and string functions
+#include <math.h>
 
 // To run: e.g. ./predict
 // User input asked: year to examine, estimated death year, month
@@ -13,9 +14,10 @@
 
 #define LINESIZE 128  // max size of input line
 
-char *gettoken (const char *);          // create null-terminated token for textual entry
-int get8tokens (char *, char **);       // parse all tokens from line
-int contains_question (const char *);   // see if input contains "?"
+char *gettoken (const char *);               // create null-terminated token for textual entry
+int get9tokens (char *, char **);            // parse all tokens from line
+int contains_question (const char *);        // see if input contains "?"
+float inflation_effects (float, float, int); // effect of inflation over time on annuity income
 
 int main ()
 {
@@ -28,30 +30,37 @@ int main ()
   int months;            // number of months for calculation (normally 12)
   int havecpi;           // flag indicating both start_cpi and end_cpi were specified
 
-  // Next 7 are parsed from input line
-  int start_mo;      // month of year to start calculations
-  float start_cpi=0; // CPI for PREIOUS month to start_mo
-  int start_assets;  // assets (thousands) at start of start_mo
-  int end_mo;        // month of year to end calculations
-  float end_cpi=0;   // CPI for end_mo
-  int end_assets;    // assets (thousands) at end of end_mo
-  float spent;       // thousands spent from start_mo through end_mo
-  float annuity;     // monthly annuity income (started UCAR 9/2023)
+  // Next 9 are parsed from input file
+  int beg_mo;             // month of year to start calculations
+  float beg_cpi=0;        // CPI for PREIOUS month to beg_mo
+  int beg_assets;         // assets (thousands) at start of beg_mo
+  int end_mo;             // month of year to end calculations
+  float end_cpi=0;        // CPI for end_mo
+  int end_assets;         // assets (thousands) at end of end_mo
+  float spent;            // thousands spent from beg_mo through end_mo
+  float annuity;          // monthly annuity income assumed fixed over time (started UCAR 9/2023)
+  float socsec;           // monthly social security income assumed adjusted for inflation over time
 
-  int ramp_year;     // year to ramp to 0
-  int ramp_mo;       // month to ramp to 0
-  float change;      // change in asset value
-  int nmonths;       // number of months to ramp to zero
+  float annuity_final;    // monthly annuity at end of prediction period (adjusted for inflation)
+  int ramp_year;          // year to ramp to 0
+  int ramp_mo;            // month to ramp to 0
+  float change;           // change in asset value
+  int nmonths;            // number of months to ramp to zero
   float percent;
-  float permo;       // amount can withdraw per month
-  float peryear;     // amount can withdraw per year
-  char *tokens[8];   // useful data from line
+  float permo_init;       // beg amount can withdraw per month
+  float permo_final;      // end amount can withdraw per month (less than init due to inflation)
+  float peryear_init;     // beg amount can withdraw per year
+  float peryear_final;    // end amount can withdraw per year (less than init due to inflation)
+  float future_inflation; // anticipated inflation (percent, user input) applies to fixed annuity
+  char *tokens[9];        // useful data from line
 
   // Read through entries, skipping those that don't start with a digit
   printf ("Enter input year\n");
   scanf ("%4s", year);
   printf ("Enter end year and month for prediction ramp\n");
   scanf ("%d %d", &ramp_year, &ramp_mo);
+  printf ("Enter expected average inflation over ramp period (floating percent)\n");
+  scanf ("%f", &future_inflation);
 
   // Open required input file
   if ((fp = fopen ("./yearly_data", "r")) == NULL) {
@@ -68,19 +77,19 @@ int main ()
     }
   } while (strncmp (line, year, 4) != 0);
 
-  if (get8tokens (line, tokens) < 0) {
-    printf ("get8tokens failed\n");
+  if (get9tokens (line, tokens) < 0) {
+    printf ("get9tokens failed\n");
     return 1;
   }
 
   havecpi = 1;
-  start_mo = atoi (tokens[0]);
+  beg_mo = atoi (tokens[0]);
   if (*tokens[1] == '?')
     havecpi = 0;
   else
-    start_cpi  = atof (tokens[1]);
+    beg_cpi  = atof (tokens[1]);
 
-  start_assets = atoi (tokens[2]);
+  beg_assets = atoi (tokens[2]);
   end_mo       = atoi (tokens[3]);
   if (*tokens[4] == '?')
     havecpi = 0;
@@ -89,60 +98,74 @@ int main ()
   end_assets = atoi (tokens[5]);
   spent      = atof (tokens[6]);
   annuity    = atof (tokens[7]);
+  socsec     = atof (tokens[8]);
   
-  months = end_mo - start_mo + 1;
+  months = end_mo - beg_mo + 1;
 
   // Calculate inflation: Normalize by (12./months) in case not computing for an entire year
   // For now this is just a diagnostic (i.e. not used in other calculations)
   if (havecpi) {
-    inflation = ((end_cpi - start_cpi) /  start_cpi) * (12./months) * 100.;
+    inflation = ((end_cpi - beg_cpi) /  beg_cpi) * (12./months) * 100.;
     printf ("Annualized inflation for year %s month %d through %d was %5.2f%%\n",
-	    year, start_mo, end_mo, inflation);
+	    year, beg_mo, end_mo, inflation);
   } else {
-    printf ("Skipping inflation calc since one or both of start_cpi/end_cpi were not specified\n");
+    printf ("Skipping inflation calc since one or both of beg_cpi/end_cpi were not specified\n");
   }
 
   // Calculate change of assets (% normalized to 1 year)
   // NOTE: change automatically INCLUDES income from outside sources (SS, interest-only, CSU med)
   // This is because those income source go directly into checking.
-  change = (float) (end_assets - start_assets);
-  percent = 100. * change / (float) start_assets * (12./months);
+  change = (float) (end_assets - beg_assets);
+  percent = 100. * change / (float) beg_assets * (12./months);
   if (months == 12)
     printf ("Assets changed from $%dK to $%dK which is a yearly change of %4.1f%%\n",
-	    start_assets, end_assets, percent);
+	    beg_assets, end_assets, percent);
   else
     printf ("Assets changed from $%dK to $%dK which is an ESTIMATED yearly change of %4.1f%%\n",
-	    start_assets, end_assets, percent);
+	    beg_assets, end_assets, percent);
 
-  // Estimate before-taxes money spent as spent*1.25
-  spent *= 1.25;
+  // Estimate before-taxes money spent as spent*1.18
+  spent *= 1.18;
 
   // Adjust change for amount spent BEFORE taxes, and scale for partial year if necessary
   change = (change + spent) * (12./months);
-  percent = (100. * change) / start_assets;
+  percent = (100. * change) / beg_assets;
   if (months == 12) {
-    printf ("Including spending of $%6.3fK with assumed 25%% total income tax,\n"
+    printf ("Including spending of $%6.3fK with assumed 18%% total income tax,\n"
 	    "  asset yearly change is %4.1f%%\n", spent, percent);
   } else {
-    printf ("Spent $%4.1fK over %d months, having added 25%% for assumed income tax\n",
+    printf ("Spent $%4.1fK over %d months, having added 18%% for assumed income tax\n",
 	    spent, months);
-    printf ("Including ESTIMATED YEARLY spending of $%6.3fK with assumed 25%% total income tax,\n"
+    printf ("Including ESTIMATED YEARLY spending of $%6.3fK with assumed 18%% total income tax,\n"
 	    "  asset yearly change is %4.1f%%\n", spent*(12./months), percent);
   }
 
-  // Calculate ramp to 0 WITHOUT taking inflation into account
+  // Calculate ramp to 0 based on current dollars (assumes investments keep up with inflation)
   // (12 - end_mo) accounts for possible partial-year at start of ramp
   // ramp_mo accounts for number of months into final year of calculation (can also be partial)
   // ((ramp_year - 1) - iyear)*12 is th number of full-year months in the interval
-  iyear = atoi (gettoken (year));
-  nmonths = (12 - end_mo) + ramp_mo + ((ramp_year - 1) - iyear)*12;
-  permo = (float) end_assets / nmonths + annuity;
-  peryear = 12.*permo;
-  printf ("Assets=%d at end of month=%2d of year=%d will ramp to 0 at\n"
-	  "                      month=%2d of year=%d by drawing "
-	  "$%5.1fK per year or $%-5.2fK per mo\n",
-	  end_assets, end_mo, iyear, ramp_mo, ramp_year, peryear, permo);
-  printf ("This INCLUDES assumed lifetime annuity income of $%-5.3fK per mo\n", annuity);
+  iyear         = atoi (gettoken (year));
+  nmonths       = (12 - end_mo) + ramp_mo + ((ramp_year - 1) - iyear)*12;
+  permo_init    = (float) end_assets / nmonths + annuity       + socsec;
+  annuity_final = inflation_effects (annuity, future_inflation, nmonths);
+  permo_final   = (float) end_assets / nmonths + annuity_final + socsec;
+  peryear_init  = 12.*permo_init;
+  peryear_final = 12.*permo_final;
+
+  printf ("\nThe following calcs assume year=%d numbers\n", iyear);
+  printf ("Inflation decreases to initial value are made for fixed annuity\n");
+  printf ("It is ASSUMED that soc sec income and investments will match inflation\n");
+  printf ("  Thus ALL predicted numbers (including fixed annuity) are in %d dollars\n", iyear);
+  printf ("Predicted draw numbers INCLUDE fixed annuity=$%-5.3fK/mo and soc sec=$%-5.3fK/mo\n",
+	  annuity, socsec);
+  printf ("Fixed annuity=$%-.3fK year=%d mo=%d becomes $%-.3fK year=%d mo=%d given inflation=%-.1f%%\n",
+	  annuity, iyear, end_mo, annuity_final, ramp_year, ramp_mo, future_inflation);
+  printf ("Assets=$%dK plus annuities plus soc sec year=%d mo=%d ramp to $0 year=%d mo=%d given:\n",
+	  end_assets, iyear, end_mo, ramp_year, ramp_mo);
+  printf ("  Initial draw=$%-.1fK/yr or $%-.2fK/mo\n", peryear_init, permo_init);
+  printf ("  Final draw=  $%-.1fK/yr or $%-.2fK/mo\n", peryear_final, permo_final);
+  printf ("Initial draw of only INVESTED assets=$%-.1fK/yr or $%-.2fK/mo\n",
+	  peryear_init - annuity*12. - socsec*12., permo_init - annuity - socsec);
   return 0;
 }
 
@@ -172,7 +195,7 @@ char *gettoken (const char *str)
   return token;
 }
 
-int get8tokens (char *str, char **tokens)
+int get9tokens (char *str, char **tokens)
 {
   const char *delim = " \t";
   strtok (str, delim);
@@ -184,5 +207,15 @@ int get8tokens (char *str, char **tokens)
   if (!(tokens[5] = strtok(NULL, delim))) return -1;
   if (!(tokens[6] = strtok(NULL, delim))) return -1;
   if (!(tokens[7] = strtok(NULL, delim))) return -1;
+  if (!(tokens[8] = strtok(NULL, delim))) return -1;
   return 0;
+}
+
+// inflation_effects. Equation comes from exact formulation of "rule of 72" (see Wikipedia)
+// Translated to yearly inflation effects the equation is:
+// months/12 = log (initial/final) / log (1+interest) OR
+// final = initial / exp (log (1 + interest)*months/12)
+float inflation_effects (float initial_value, float future_inflation, int nmonths)
+{
+  return initial_value / exp (log (1. + 0.01*future_inflation)*nmonths/12.);
 }
