@@ -21,7 +21,7 @@ int main ()
 
   // Next 9 are parsed from input file
   int begmo, endmo;              // month of year to start calculations
-  float begcpi, endcpi;          // CPI for PREIOUS month to begmo
+  float begcpi, endcpi;          // CPI for beginning and ending times
   float begassets, endassets;    // assets (thousands) at start of begmo
   float change;                  // change in asset value
   float percent;
@@ -91,13 +91,13 @@ int main ()
   // Adjust for the fact that $306K TIAA assets disappeared in Sept. 2023 due to annuitization
   // Also, decrease the 306K by adjusting it for inflation effects Sep 2023 to endyr
   if (begyr < 2023 && endyr >= 2023) {
-    const int assets_annuitized_2023 = 306;
-    const float sepcpi_2023          = 307.789;
+    const int assets_annuitized_2023 = 306;     // K$ annuitized sept 2023
+    const float sepcpi_2023          = 307.789; // cpi value at time annuitization
     float inflation                  = (endcpi - sepcpi_2023) / sepcpi_2023;
     float decrease                   = assets_annuitized_2023 / (1. + inflation);
     endassets += decrease;
-    printf ("2023 annuity = %dK decreased to %4.1fK due to inflation=%4.1f%% Sep 2023 through "
-            "end date\n",
+    printf ("2023 annuity value=%dK assumed to have dropped to %4.1fK due to inflation=%4.1f%% Sep "
+            "2023 through end date\n",
 	    assets_annuitized_2023, decrease, 100.*inflation);
   }
   
@@ -111,7 +111,7 @@ int main ()
   percent = 100.*change / (float) endassets;
   printf ("Adjusted for inflation, in %d dollars, assets over the %d months changed by %4.1f%%\n",
 	  endyr, months, percent);
-  printf ("This translates to an annualized number of %4.1f%%\n", percent*(12./months));
+  printf ("This translates to an annualized value of %4.1f%%\n", percent*(12./months));
   return 0;
 }
 
