@@ -18,7 +18,8 @@ int get_fund_name (char *, char *);
   double yearly;      // yearly income
   double income;      // yearly income (computed)
   double rate;        // yearly payout rate
-  double total = 0.;  // total invested in bond funds
+  double v_tot = 0.;  // total invested in bond funds
+  double i_tot = 0.;  // total income from bond funds
   int nument = 0;     // number of entries found
 
   // Open required input file
@@ -37,34 +38,38 @@ int get_fund_name (char *, char *);
   while (fgets (line, LINESIZE, fp) != NULL) {
     if (get_fund_name (line, fund_name) < 0)
       return -1;
-    if (sscanf (line, "%*s %lf %lf %lf", &value, &monthly, &quarterly) != 3) {
+    if (sscanf (line, "%*s %lf %lf %lf %lf", &value, &monthly, &quarterly, &yearly) != 4) {
       printf ("bad input line=%s\n", line);
       return 1;
     }
     ++nument;
-    total += value;
+    v_tot += value;
     
     if (monthly > 0.) {
       income = monthly*12.;
+      i_tot += income;
       rate = 100.* (income / value);
       printf ("fund=%24s value=%.1lf yearly income=%.1lf rate=%.1lf%%\n",
 	      fund_name, value, income, rate);
     } else if (quarterly > 0.) {
       income = quarterly*4.;
+      i_tot += income;
       rate = 100.* (income / value);
       printf ("fund=%24s value=%.1lf yearly income=%.1lf rate=%.1lf%%\n",
 	      fund_name, value, income, rate);
     } else if (yearly > 0.) {
       income = value;
+      i_tot += income;
       rate = 100.* (income / value);
       printf ("fund=%24s value=%.1lf yearly income=%.1lf rate=%.1lf%%\n",
 	      fund_name, value, income, rate);
     } else {
-      printf ("fund=%s monthly quarterly or yearly value not found. Skipping \n", fund_name);
+      printf ("fund=%s monthly quarterly or yearly income not found. Skipping \n", fund_name);
     }
   
   }
-  printf ("%d entries were found totaling %.1lf\n", nument, total);
+  printf ("%d entries were found value total=%.1lf income total=%.1lf\n", nument, v_tot, i_tot);
+  
   return 0;
 }
 
