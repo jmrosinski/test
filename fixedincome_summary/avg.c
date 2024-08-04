@@ -51,7 +51,9 @@ int main ()
     ++nument;
     income   = amt*rate;
     actual   = income*(1. - taxrate);
-    realized = actual - inflation*amt;
+    // To compute "realized", inflation only applies to "amt" lessened by income*taxrate because
+    // income*taxrate has already gone to the government (see "actual" computation above)
+    realized = actual - inflation*(amt - income*taxrate);
 
     amttot      += amt;
     incometot   += income;
