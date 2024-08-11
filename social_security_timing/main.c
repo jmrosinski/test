@@ -34,7 +34,8 @@ int main ()
     // *_total values are for the end of the year in question
     // "arb" is the early yearly traunch
     // "banked_fraction" is the initial traunch when waiting till latest possible age
-    // 0.005 is due to accumulating new income monthly over an entire year and investing it.
+    // 0.005 is for accumulating new income monthly over an entire year and investing it.
+    //   If per-year ss were doled out entirely on Jan 1 this number would be 0.01 (% to fraction)
     early_total += arb*(1. + invest_percent*0.005) +     // invested income this yr traunch
                    early_total*(invest_percent*0.01);    // invested income from prv yrs total
     if (age < late_start_age) {
