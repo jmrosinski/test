@@ -11,11 +11,11 @@ double alter_benefits (const struct AGE, const struct AGE);
 // Find break-even age for starting social security benefits at 2 different times
 // Inputs:
 //   birth date (full retirement age depends on this)
-//   early starting age, late starting age (must be between 62 and 70)
+//   early ss starting age, late starting age (must be between 62 and 70)
 //   assumed above-inflation yearly percentage achieved by investing ss income
 // Output:
 //   age at which starting benefits later first exceeds starting benefits earlier, assuming
-//   all benefits are invested and earn user-specified yearly % (can even be 0 or negative)
+//   all benefits are invested and earn user-specified yearly % (which can even be 0 or negative)
 //
 // Source of adjustments to ss benefits based on birth date and age benefits are started:
 //   www.fool.com/investing/how-much-does-waiting-claim-raise-social-security.aspx
@@ -37,26 +37,28 @@ int main ()
   int done, foundit;             // flag to exit loop
   int yrs, mos;                  // years and months iterators
 
-  printf ("Enter birth date as \"year mo\" but NOTE:\n");
-  printf ("If born 1st of month enter previuos month (and year if applicable) as birth date\n");
+  printf ("Enter birth date as \"year mo\" (e.g. mo is 1 for Jan) but NOTE:\n");
+  printf ("If born 1st of month enter previuos month (and year if Jan) as birth date\n");
   scanf ("%d %d", &bdate.yr, &bdate.mo);
-  if (bdate.yr < 1943) {
-    printf ("Behavior for birth years earlier than 1943 is unknown. Giving up\n");
-    return 1;
-  } else if (bdate.yr < 1955) {
-    fra.yrs = 66;
-    fra.mos = 0;
+  if (bdate.yr < 1938) {
+    fra.yrs = 65; fra.mos = 0;
+  } else if (bdate.yr > 1942 && bdate.yr < 1955) {
+    fra.yrs = 66; fra.mos = 0;
   } else if (bdate.yr > 1959) {
-    fra.yrs = 67;
-    fra.mos = 0;
+    fra.yrs = 67; fra.mos = 0;
   } else {
-    fra.yrs = 66;
     switch (bdate.yr) {
-    case 1955: fra.mos = 2; break;
-    case 1956: fra.mos = 4; break;
-    case 1957: fra.mos = 6; break;
-    case 1958: fra.mos = 8; break;
-    case 1959: fra.mos = 10; break;
+    case 1938: fra.yrs = 65; fra.mos = 2; break;
+    case 1939: fra.yrs = 65; fra.mos = 4; break;
+    case 1940: fra.yrs = 65; fra.mos = 6; break;
+    case 1941: fra.yrs = 65; fra.mos = 8; break;
+    case 1942: fra.yrs = 65; fra.mos = 10; break;
+
+    case 1955: fra.yrs = 66; fra.mos = 2; break;
+    case 1956: fra.yrs = 66; fra.mos = 4; break;
+    case 1957: fra.yrs = 66; fra.mos = 6; break;
+    case 1958: fra.yrs = 66; fra.mos = 8; break;
+    case 1959: fra.yrs = 66; fra.mos = 10; break;
     default:
       printf ("Unknown bdate.yr=%d\n", bdate.yr);
       return 2;
@@ -127,7 +129,7 @@ void get_start (struct AGE *start, const char *txt)
 {
   int done = 1;
   do {
-    printf ("Enter %s age to start taking ss income as years plus months\n", txt);
+    printf ("Enter %s age to start taking ss income as years plus (zero-based) months\n", txt);
     scanf ("%d %d", &start->yrs, &start->mos);
     if (start->yrs < 62 || start->yrs > 70) {
       printf (" start year must be between 62 and 70\n");
