@@ -48,19 +48,22 @@ int get_fund_name (char *, char *);
     if (monthly > 0.) {
       income = monthly*12.;
       i_tot += income;
-      rate = 100.* (income / value);
+      // Not perfect but assume principle to compute rate was value before income got added
+      rate = 100.* (income / (value-monthly));
       printf ("fund=%24s value=%.1lf yearly income=%.1lf rate=%.1lf%%\n",
 	      fund_name, value, income, rate);
     } else if (quarterly > 0.) {
       income = quarterly*4.;
       i_tot += income;
-      rate = 100.* (income / value);
+      // Not perfect but assume principle to compute rate was value before income got added
+      rate = 100.* (income / (value-quarterly));
       printf ("fund=%24s value=%.1lf yearly income=%.1lf rate=%.1lf%%\n",
 	      fund_name, value, income, rate);
     } else if (yearly > 0.) {
-      income = value;
+      income = yearly;
       i_tot += income;
-      rate = 100.* (income / value);
+      // Not perfect but assume principle to compute rate was value before income got added
+      rate = 100.* (income / (value-yearly));
       printf ("fund=%24s value=%.1lf yearly income=%.1lf rate=%.1lf%%\n",
 	      fund_name, value, income, rate);
     } else {
