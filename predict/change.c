@@ -1,8 +1,11 @@
 #include <stdio.h>
-#include <stdlib.h>  // malloc, free
-#include <ctype.h>   // atoi
+#include <stdlib.h>  // atoi
 #include <string.h>  // memset and string functions
 #include <math.h>
+
+// Compute change in assets from one point to another in the file yearly_data
+// Include estimate of change in value for annuities that have begun but whose
+// source doesn't provide current value info to the customer, e.g. TIAA
 
 #define LINESIZE 128  // max size of input line
 
@@ -20,7 +23,7 @@ int main ()
   int months;                    // number of months for calculation
 
   // Next 9 are parsed from input file
-  int begmo, endmo;              // month of year to start calculations
+  int begmo, endmo;              // month of year to start and end calculations
   float begcpi, endcpi;          // CPI for beginning and ending times
   float begassets, endassets;    // assets (thousands) at start of begmo
   float change;                  // change in asset value
@@ -88,29 +91,68 @@ int main ()
   printf ("Total inflation for year %d month %d through year %d month %d was %5.2f%%\n",
 	  begyr, begmo, endyr, endmo, 100.*total_inflation);
 
-  // Adjust for the fact that $306K TIAA assets disappeared in Sept. 2023 due to annuitization
-  // Also, decrease the 306K by adjusting it for inflation effects Sep 2023 to endyr
-  if (begyr < 2023 && endyr >= 2023) {
-    const int assets_annuitized_2023 = 306;     // K$ annuitized sept 2023
-    const float sepcpi_2023          = 307.789; // cpi value at time annuitization
-    float inflation                  = (endcpi - sepcpi_2023) / sepcpi_2023;
-    float decrease                   = assets_annuitized_2023 / (1. + inflation);
-    endassets += decrease;
-    printf ("2023 annuity value=%dK assumed to have dropped to %4.1fK due to inflation=%4.1f%% Sep "
-            "2023 through end date\n",
-	    assets_annuitized_2023, decrease, 100.*inflation);
-  }
+  // Adjust ending assets for started annuity values (e.g. TIAA) for which current value can no 
+  // longer be tracked by user. Estimate value decrease due to inflation, and to life expectancy
+  // decrease with time.
+  // Calculations are only good to the nearest  year due to life expectancy tables.
   
+#define NUM_ANNUITIES 1
+#define MAXLIFE 101
+  // const values below are specific to the individual
+  const int birth_yr                           = 1958;
+  const int annuity_startyr[NUM_ANNUITIES]     = {2023};
+  const float start_cpi[NUM_ANNUITIES]         = {307.789};  // Sep. 2023 CPI value
+  const float assets_annuitized[NUM_ANNUITIES] = {306.};     // K dollars
+  float life_expect[MAXLIFE];
+  int idx;
+  float val;
+  FILE *fp2;
+
+  // File life_expectancy taken from: https://www.ssa.gov/oact/STATS/table4c6.html
+  // Note: Male values were taken, but female values are also in the file
+  if ( ! (fp2 = fopen ("./life_expectancy", "r"))) {
+    printf ("Cannot open file life_expectancy for reading. Quitting\n");
+    exit(1);
+  }
+  for (int i = 0; i < MAXLIFE; ++i)
+    life_expect[i] = 1.e36;
+  
+  while (fscanf (fp2, "%d %f", &idx, &val) != EOF) {
+    if (idx > 0 && idx < MAXLIFE) {
+      life_expect[idx] = val;
+    } else {
+      printf ("idx=%d is invalild. Quitting\n", idx);
+      exit(1);
+    }
+  }
+  for (int n = 0; n < NUM_ANNUITIES; ++n) {
+    if (begyr < annuity_startyr[n] && endyr >= annuity_startyr[n]) {
+      float inflation                 = (endcpi - start_cpi[n]) / start_cpi[n];
+      int annuity_startage            = annuity_startyr[n] - birth_yr;
+      int endage                      = endyr - birth_yr;
+      float life_expect_decrease_frac = (life_expect[annuity_startage] - life_expect[endage]) /
+	                                life_expect[annuity_startage];
+      float annuity_value             = assets_annuitized[n] / (1. + inflation);
+      annuity_value                  /= 1. + life_expect_decrease_frac;
+                                        
+      endassets += annuity_value;
+      printf ("Annuity %d init value=%4.1fK estimated to drop to %4.1fK over %d years %d to %d\n",
+	      n, assets_annuitized[n], annuity_value, endyr-annuity_startyr[n],
+	      annuity_startyr[n], endyr);
+      printf ("...due to inflation =%4.1f%% and life expectancy decrease fraction=%4.1f%%\n",
+	      100.*inflation, 100.*life_expect_decrease_frac);
+    }
+  }
   // Calculate change of assets (% normalized to 1 year)
   change  = endassets - begassets;
   percent = 100.*(12./months)*change / begassets;
-  printf ("Assets changed from $%4.1fK to $%4.1fK which is an annualized change of %4.1f%%\n",
+  printf ("Unadjusted assets changed from $%4.1fK to $%4.1fK which is an annualized change of %4.1f%%\n",
 	  begassets, endassets, percent);
   
   change = endassets - begassets*(1. + total_inflation);
   percent = 100.*change / (float) endassets;
-  printf ("Adjusted for inflation, in %d dollars, assets over the %d months changed by %4.1f%%\n",
-	  endyr, months, percent);
+  printf ("Adjusted for inflation, in constant dollars, assets over the %d months changed by %4.1f%%\n",
+	  months, percent);
   printf ("This translates to an annualized value of %4.1f%%\n", percent*(12./months));
   return 0;
 }
