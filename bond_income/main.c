@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <ctype.h>
+#include <string.h>
 
 #define LINESIZE 128  // max size of input line
 #define MAXNAME 24    // max size of fund name
@@ -9,7 +10,8 @@ int get_fund_name (char *, char *);
   int main ()
 {
   char line[LINESIZE]; // input line
-  char *infile = "bond_funds";
+  char infile[64] = "bond_funds"; // default
+  char ans[1]    = " ";           // whether to use default
   FILE *fp;
   char fund_name[MAXNAME+1];
   double value;       // current fund value
@@ -23,6 +25,12 @@ int get_fund_name (char *, char *);
   int nument = 0;     // number of entries found
 
   // Open required input file
+  printf ("Enter 'y' to use input file=%s\n", infile);
+  scanf ("%s", ans);
+  if (ans[0] != 'y') {
+    printf ("Enter input file\n");
+    scanf ("%s", infile);
+  }
   if ((fp = fopen (infile, "r")) == NULL) {
     printf ("cannot open input file %s\n", infile);
     return 1;
