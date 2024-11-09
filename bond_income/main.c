@@ -15,6 +15,7 @@ int get_fund_name (char *, char *);
   FILE *fp;
   char fund_name[MAXNAME+1];
   double value;       // current fund value
+  double mult;        // multiplication factor accounts for multiple accounts holding this stock
   double monthly;     // monthly income
   double quarterly;   // quarterly income
   double yearly;      // yearly income
@@ -46,12 +47,18 @@ int get_fund_name (char *, char *);
   while (fgets (line, LINESIZE, fp) != NULL) {
     if (get_fund_name (line, fund_name) < 0)
       return -1;
-    if (sscanf (line, "%*s %lf %lf %lf %lf", &value, &monthly, &quarterly, &yearly) != 4) {
+    if (sscanf (line, "%*s %lf %lf %lf %lf %lf",
+		&value, &mult, &monthly, &quarterly, &yearly) != 5) {
       printf ("bad input line=%s\n", line);
       return 1;
     }
     ++nument;
-    v_tot += value;
+    value     *= mult;
+    monthly   *= mult;
+    quarterly *= mult;
+    yearly    *= mult;
+    
+    v_tot     += value;
     
     if (monthly > 0.) {
       income = monthly*12.;
