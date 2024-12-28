@@ -23,8 +23,18 @@ int main()
   double capg_qdiv;      // capital gains + qualified dividends (assumed taxed at cgrate)
   double agi;            // adjusted gross income (income + ordinary dividends + cap gains)
   double taxable_income; // agi - std deduction
+  double taxed_fromtable;      // taxable_income - capg_qdiv
   double tax;            // estimated federal tax
   double cgtax;          // tax on cap gains+qdiv
+  // CO-specific items
+  const double COtaxrate [NUMYRS] = {4.4, 4.25}; // CO tax rate (%) for each year
+  const double ssreduce = 24.;   // Age 65 and above CO allows up to 24K removal of SS+annuity
+  const double maxcharity = 0.5; // CO allows up to $500 chartiable deduction
+  const double tabor[NUMYRS] = {0.8, 0.277}; // 0.277 is for AGI between $105K and $166K
+  double usbondincome;           // CO doesn't tax US bond income
+  double reductions;
+  double COincome;
+  double COtax;
 
   // function prototypes
   int get_yridx (int);                 // find index to match year
@@ -69,19 +79,19 @@ int main()
 
   // Remove capg_qdiv from taxable income because rate on capg_qdiv is lower.
   // It will be added later.
-  taxable_income -= capg_qdiv;
-  if (taxable_income > kicksinat[idx][NUMBRACKETS-1]) {
-    printf ("Need to add a bracket: taxable_income=$%.3lfK exceeds top limit of $%.3lfK Quitting\n",
-	    taxable_income, kicksinat[idx][NUMBRACKETS-1]);
+  taxed_fromtable = taxable_income - capg_qdiv;
+  if (taxed_fromtable > kicksinat[idx][NUMBRACKETS-1]) {
+    printf ("Need to add a bracket: taxed_fromtable=$%.3lfK exceeds top limit of $%.3lfK Quitting\n",
+	    taxed_fromtable, kicksinat[idx][NUMBRACKETS-1]);
     return -1;
   }
 
   // Loop over tax brackets to figure total tax
   tax = 0.;
-  for (int i = 0; i < NUMBRACKETS-1 && taxable_income >= kicksinat[idx][i]; ++i) {
-    double limit = fmin (kicksinat[idx][i+1], taxable_income);
+  for (int i = 0; i < NUMBRACKETS-1 && taxed_fromtable >= kicksinat[idx][i]; ++i) {
+    double limit = fmin (kicksinat[idx][i+1], taxed_fromtable);
     tax += (limit - kicksinat[idx][i]) * 0.01*taxrate[i];  // 0.01 converts percent to fraction
-    if (taxable_income < kicksinat[idx][i+1])
+    if (taxed_fromtable < kicksinat[idx][i+1])
       break;
   }
   printf ("tax on pure income=$%.3lfK\n", tax);
@@ -89,7 +99,16 @@ int main()
   cgtax = capg_qdiv*0.01*cgrate;
   printf ("tax on cap gains+qdiv=$%.3lfK\n", cgtax);
   tax += cgtax;
-  printf ("total tax=$%.3lfK\n", tax);
+  printf ("federal tax=$%.3lfK\n", tax);
+
+  // Begin CO state tax calculation
+  printf ("Enter income from US bonds (was included in 'income' earlier)\n");
+  scanf ("%lf", &usbondincome);
+  reductions = ssreduce + maxcharity + usbondincome;
+  printf ("CO reductions=$%.3lf\n", reductions);
+  COincome   = taxable_income - reductions;
+  COtax      = COincome*0.01*COtaxrate[idx] - tabor[idx];;
+  printf ("CO tax=$%.3lfK\n", COtax);
 	  
   return 0;
 }
