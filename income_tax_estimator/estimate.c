@@ -10,14 +10,18 @@ const double kicksinat[NUMYRS][NUMBRACKETS] = {{0.,11., 44.725,95.375, 182.1},
 int main()
 {
   // All dollar-based floating point settings and inputs are in thousands
-  const double std_deduction[NUMYRS] = {15.7,16.45};
-  const double taxrate [NUMBRACKETS] = {10.,12.,22.,24.,32.}; // tax rate (%) for each bracket
+  const double std_deduction[NUMYRS] = {15.7, 16.45};
+  const double taxrate [NUMBRACKETS] = {10., 12., 22., 24., 32.}; // tax rate (%) for each bracket
   const double cgrate = 15.; // Cap gains rate ASSUMED to be this percent
   int idx;               // user input: index into arrays to match "year"
   int year;              // user input: year to estimate federal taxes
   int topbracketidx;     // index of top income bracket
-  double income;         // user input: total income not including cap gains/qualified dividends
-  double capgains;       // user input: capital gains net
+  double income;         // user input: taxable income (not including US bond income)
+  double usbondincome;   // income from USbonds. NOTE: CO doesn't tax US bond income
+  double shortcg;        // user input: short-term capital gains
+  double longcg;         // user input: long-term capital gains
+  double capgains;       // capital gains net
+  double carryover = 0.; // extent to which net capital LOSS exceeds $3K
   double odiv;           // user input: ordinary dividends
   double qdiv;           // user input: qualified dividends
   double capg_qdiv;      // capital gains + qualified dividends (assumed taxed at cgrate)
@@ -31,10 +35,9 @@ int main()
   const double ssreduce = 24.;   // Age 65 and above CO allows up to 24K removal of SS+annuity
   const double maxcharity = 0.5; // CO allows up to $500 chartiable deduction
   const double tabor[NUMYRS] = {0.8, 0.277}; // 0.277 is for AGI between $105K and $166K
-  double usbondincome;           // CO doesn't tax US bond income
-  double reductions;
-  double COincome;
-  double COtax;
+  double reductions;             // reductions to income for CO tax purposes
+  double COincome;               // income to apply CO tax rate to
+  double COtax;                  // CO tax owed
 
   // function prototypes
   int get_yridx (int);                 // find index to match year
@@ -49,8 +52,12 @@ int main()
   printf ("Estimating federal tax for year=%d\n", year);
   printf ("NOTE: All requested input is expected in floating point thousands of dollars\n");
   
-  printf ("Enter taxable income excluding capgains and dividends (maybe 2b+4b+5b+6b of 1040)\n");
+  printf ("Enter taxable income exclude capgains, dividends and USbonds (maybe 4b+5b+6b of 1040)\n");
   scanf ("%lf", &income);
+
+  printf ("Enter income from US bonds ()\n");
+  scanf ("%lf", &usbondincome);
+  income += usbondincome;
 
   printf ("Enter ordinary dividends (maybe line 3b of 1040)\n");
   scanf ("%lf", &odiv);
@@ -58,8 +65,26 @@ int main()
   printf ("Enter qualified dividends (maybe line 3a of 1040)\n");
   scanf ("%lf", &qdiv);
 
-  printf ("Enter net capital gains (maybe line 16 of schedule D)\n");
-  scanf ("%lf", &capgains);
+  printf ("Enter short-term capital gains (maybe line 7 of schedule D)\n");
+  scanf ("%lf", &shortcg);
+
+  printf ("Enter long-term capital gains (maybe line 15 of schedule D)\n");
+  scanf ("%lf", &longcg);
+
+  // Positive short-term gains taxed as regular income
+  // Negative short-term gains added to total cap gains (taxed at 15%)
+  capgains = longcg;
+  if (shortcg > 0.)
+    income   += shortcg;
+  else
+    capgains += shortcg;
+
+  // Max net CG loss is $3000. The rest can be carried over to the next year(s)
+  if (capgains < 0.) {
+    carryover = fabs (fmin (0., capgains + 3.));  // make "carryover" a non-negative number
+    capgains  = fmax (capgains, -3.);             // negative net gains cannont exceed $3K
+  }
+  printf ("Net capgains=%.3lf carryover=%.3lf\n", capgains, carryover);
 
   capg_qdiv = capgains + qdiv;
   printf ("cap gains + qualified dividends=$%.3lfK ASSUMED to be taxed at %.3lf%%\n",
@@ -81,7 +106,7 @@ int main()
   // It will be added later.
   taxed_fromtable = taxable_income - capg_qdiv;
   if (taxed_fromtable > kicksinat[idx][NUMBRACKETS-1]) {
-    printf ("Need to add a bracket: taxed_fromtable=$%.3lfK exceeds top limit of $%.3lfK Quitting\n",
+    printf ("Insufficient brackets:taxed_fromtable=$%.3lfK exceeds top limit of $%.3lfK Quitting\n",
 	    taxed_fromtable, kicksinat[idx][NUMBRACKETS-1]);
     return -1;
   }
@@ -101,9 +126,7 @@ int main()
   tax += cgtax;
   printf ("federal tax=$%.3lfK\n", tax);
 
-  // Begin CO state tax calculation
-  printf ("Enter income from US bonds (was included in 'income' earlier)\n");
-  scanf ("%lf", &usbondincome);
+  // Next: CO state tax calculation
   reductions = ssreduce + maxcharity + usbondincome;
   printf ("CO reductions=$%.3lf\n", reductions);
   COincome   = taxable_income - reductions;
