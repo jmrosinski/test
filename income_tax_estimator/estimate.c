@@ -44,7 +44,10 @@ int main()
   int get_topbracketidx (int, double); // find index of top tax bracket
 
   printf ("Enter tax year for calculation:\n");
-  scanf ("%d", &year);
+  if (scanf ("%d %*s", &year) < 1) {
+    printf ("Year not found. Quitting\n");
+    return -1;
+  }
   if ((idx = get_yridx (year)) < 0) {
     printf ("index for year=%d not found. Quitting\n", year);
     return -1;
@@ -53,42 +56,86 @@ int main()
   printf ("NOTE: All requested input is expected in floating point thousands of dollars\n");
   
   printf ("Enter taxable income exclude capgains, dividends and USbonds (maybe 4b+5b+6b of 1040)\n");
-  scanf ("%lf", &income);
+  if (scanf ("%lf %*s", &income) < 1 || income < 0.) {
+    printf ("income not found or negative. Quitting\n");
+    return -1;
+  }
+  printf ("Got income=$%.3lfK\n", income);
 
   printf ("Enter income from US bonds ()\n");
-  scanf ("%lf", &usbondincome);
+  if (scanf ("%lf %*s", &usbondincome) < 1 || usbondincome < 0.) {
+    printf ("income from US bonds not found or negative. Quitting\n");
+    return -1;
+  }
+  printf ("Got US bond income=$%.3lfK\n", usbondincome);
   income += usbondincome;
 
   printf ("Enter ordinary dividends (maybe line 3b of 1040)\n");
-  scanf ("%lf", &odiv);
+  if (scanf ("%lf %*s", &odiv) < 1 || odiv < 0.) {
+    printf ("ordinary dividend income not found or negative. Quitting\n");
+    return -1;
+  }
+  printf ("Got ordinary dividend income=$%.3lfK\n", odiv);
 
   printf ("Enter qualified dividends (maybe line 3a of 1040)\n");
-  scanf ("%lf", &qdiv);
+  if (scanf ("%lf %*s", &qdiv) < 1 || qdiv < 0.) {
+    printf ("qualified dividend income not found or negative. Quitting\n");
+    return -1;
+  }
+  printf ("Got qualified dividend income=$%.3lfK\n", qdiv);
 
   printf ("Enter short-term capital gains (maybe line 7 of schedule D)\n");
-  scanf ("%lf", &shortcg);
-
-  printf ("Enter long-term capital gains (maybe line 15 of schedule D)\n");
-  scanf ("%lf", &longcg);
-
-  // Positive short-term gains taxed as regular income
-  // Negative short-term gains added to total cap gains (taxed at 15%)
-  capgains = longcg;
-  if (shortcg > 0.)
-    income   += shortcg;
-  else
-    capgains += shortcg;
-
-  // Max net CG loss is $3000. The rest can be carried over to the next year(s)
-  if (capgains < 0.) {
-    carryover = fabs (fmin (0., capgains + 3.));  // make "carryover" a non-negative number
-    capgains  = fmax (capgains, -3.);             // negative net gains cannont exceed $3K
+  if (scanf ("%lf %*s", &shortcg) < 1) {
+    printf ("short term capital gains not found. Quitting\n");
+    return -1;
   }
-  printf ("Net capgains=%.3lf carryover=%.3lf\n", capgains, carryover);
+  printf ("Got short-term capital gains=$%.3lfK\n", shortcg);
+    
+  printf ("Enter long-term capital gains (maybe line 15 of schedule D)\n");
+  if (scanf ("%lf %*s", &longcg) < 1) {
+    printf ("long term capital gains not found. Quitting\n");
+    return -1;
+  }
+  printf ("Got long-term capital gains=$%.3lfK\n\n", longcg);
 
-  capg_qdiv = capgains + qdiv;
-  printf ("cap gains + qualified dividends=$%.3lfK ASSUMED to be taxed at %.3lf%%\n",
-	  capg_qdiv, cgrate);
+  // Figure rate on capital gains. Some fraction of short-term gains will be taxed as regular
+  // income if net gains (short+long) are positive. If both shortcg and longcg are positive,
+  // ALL of shortcg will be taxed as regular income, and ALL of longcg will be taxed at cgrate.
+  // If net cap losses exceed $3K, only the $3K will be counted this year and carried over to the
+  // next year.
+  
+  if (shortcg > 0. && longcg > 0.) {
+    income  += shortcg;
+    capgains = longcg;
+    printf ("shortcg and longcg are both gains: shortcg=income, longcg taxed at cgrate=%d%%\n",
+	    (int) cgrate);
+  } else {                    // at least one of, maybe both of shortcg, longcg are negative
+    capgains = shortcg + longcg;
+    if (capgains > 0.) {      // one of shortcg, longcg is positive, the other negative
+      printf ("Net capgains positive due to shortcg=$%.3lfK, longcg=$%.3lfK\n", shortcg, longcg);
+      if (shortcg > longcg) { // shortcg is the positive one so add the net to income
+	income += capgains;
+	// I THINK it's right to zero capgains here: It's been added to income so it shouldn't be
+	// included in the capg_qdiv calculation below this bunch of nested "if" stuff
+	capgains = 0.;
+	printf ("    income increased to $%.3lfK\n", income);
+      } else {                // longcg is the positive one so leave as is and tax the net at cgrate
+	printf ("    Net capgains=$%.3lfK\n", capgains);
+      }
+    } else { // capgains < 0:Doesn't matter whether both or just one of shortcg, longcg are negative
+      printf ("cgloss=$%.3lfK due to shortcg=$%.3lfK longcg=$%.3lfK\n",
+	      capgains, shortcg, longcg);
+      carryover = fabs (fmin (0., capgains + 3.));  // make "carryover" a non-negative number
+      capgains  = fmax (capgains, -3.);             // negative net gains cannont exceed $3K
+      printf ("  $%.3lfK will be treated as a loss and subtracted from income\n", capgains);
+      printf ("  $%.3lfK will be carried over to the next year\n", carryover);
+    }
+  }
+
+  // qdiv must be a positive number, but it's possible capgains+qdiv is negative. Thus fmax()
+  capg_qdiv = fmax (0., capgains + qdiv);
+  printf ("cap gains + qualified dividends=$%.3lfK ASSUMED to be taxed at %d%%\n",
+	  capg_qdiv, (int) cgrate);
   
   agi = income + odiv + capgains;
   printf ("adjusted gross income=$%.3lfK\n", agi);
@@ -124,12 +171,13 @@ int main()
   cgtax = capg_qdiv*0.01*cgrate;
   printf ("tax on cap gains+qdiv=$%.3lfK\n", cgtax);
   tax += cgtax;
-  printf ("federal tax=$%.3lfK\n", tax);
+  printf ("federal tax=$%.3lfK\n\n", tax);
 
   // Next: CO state tax calculation
   reductions = ssreduce + maxcharity + usbondincome;
-  printf ("CO reductions=$%.3lf\n", reductions);
+  printf ("CO reductions from taxable_income of $%.3lfK=$%.3lfK\n", taxable_income, reductions);
   COincome   = taxable_income - reductions;
+  printf ("CO taxable income=$%.3lfK\n", COincome);
   COtax      = COincome*0.01*COtaxrate[idx] - tabor[idx];;
   printf ("CO tax=$%.3lfK\n", COtax);
 	  
