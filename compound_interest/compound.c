@@ -66,26 +66,26 @@ int main ()
 void get_doubling (double r, int n)
 {
   double t = log (2.) / (n*log (1. + r/n));
-  printf ("rate=%.1lf%% cf=%d -> doubling time=%.1lf years\n", r*100., n, t);
+  printf ("rate=%.2lf%% cf=%d -> doubling time=%.2lf years\n", r*100., n, t);
 }
 
 void get_amount (double P, double r, double t, int n)
 {
   double A = P*pow((1. + r/n), n*t);
-  printf ("Principle=%.1lf rate=%.1lf%% years=%.1lf cf=%d -> final amount=%.2lf\n",
+  printf ("Principle=%.2lf rate=%.2lf%% years=%.2lf cf=%d -> final amount=%.2lf\n",
 	  P, r*100., t, n, A);
 }
 
 void get_rate (double P, double t, double A, int n)
 {
-  double r = n*(exp (log (A/P)/(n*t)) - 1.); // 100 is to convert fraction to percent
-  printf ("Principle=%.1lf years=%.1lf final amount=%.1lf cf=%d -> required rate=%.1f%%\n",
-	  P, t, A, n, r*100.);
+  double r = n*(exp (log (A/P)/(n*t)) - 1.);
+  printf ("Principle=%.2lf years=%.2lf final amount=%.2lf cf=%d -> required rate=%.2f%%\n",
+	  P, t, A, n, r*100.); // 100 converts fraction to percent
 }
 
 void get_years (double P, double A, double r, int n)
 {
   double t = log (A/P) / (n*log (1. + r/n));
-  printf ("Principle=%.1lf final amount=%.1lf rate=%.1lf%% cf=%d -> will take %.1lf years\n",
+  printf ("Principle=%.2lf final amount=%.2lf rate=%.2lf%% cf=%d -> will take %.2lf years\n",
 	  P, A, r*100., n, t);
 }
