@@ -146,14 +146,14 @@ int main ()
   // Calculate change of assets (% normalized to 1 year)
   change  = endassets - begassets;
   percent = 100.*(12./months)*change / begassets;
-  printf ("Unadjusted assets changed from $%4.1fK to $%4.1fK which is an annualized change of %4.1f%%\n",
+  printf ("Unadjusted assets changed from $%4.1fK to $%4.1fK which is an annualized change of %+4.1f%%\n",
 	  begassets, endassets, percent);
   
   change = endassets - begassets*(1. + total_inflation);
   percent = 100.*change / (float) endassets;
-  printf ("Adjusted for inflation, in constant dollars, assets over the %d months changed by %4.1f%%\n",
+  printf ("Adjusted for inflation, in constant dollars, assets over the %d months changed by %+4.1f%%\n",
 	  months, percent);
-  printf ("This translates to an annualized value of %4.1f%%\n", percent*(12./months));
+  printf ("This translates to an annualized value of %+4.1f%%\n", percent*(12./months));
   return 0;
 }
 
