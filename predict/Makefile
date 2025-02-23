@@ -3,14 +3,15 @@ CFLAGS = -c -g
 LDFLAGS = -lm
 OBJS1 = predict.o
 OBJS2 = change.o
+EXES  = predict change
 
-all: predict change
+all: $(EXES)
 
-predict: $(OBJS)
+predict: $(OBJS1)
 	$(CC) -o $@ $(OBJS1) -lm
 
 change: $(OBJS2)
 	$(CC) -o $@ $(OBJS2)
 
 clean:
-	$(RM) $(EXE) $(OBJS1) $(OBJS2)
+	$(RM) $(EXES) $(OBJS1) $(OBJS2)
