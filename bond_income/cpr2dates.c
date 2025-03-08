@@ -80,8 +80,8 @@ int get_fund_name (char *, char *);
       diff = value[1]*scale - value[0];
       change = 100.* (diff / value[0]);
     }
-    printf ("Value of %s changed (after applying mult=%.1lf)by %+.1lf dollars which is %.1lf%%\n",
-	    fund_name[0], mult[0], diff, fabs (change));
+    printf ("Value of %s changed (after applying mult=%.1lf)by %+.1lf dollars which is %+.1lf%%\n",
+	    fund_name[0], mult[0], diff, change);
   }
   return 0;
 }

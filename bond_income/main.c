@@ -42,7 +42,7 @@ int get_fund_name (char *, char *);
   fgets (line, LINESIZE, fp);
   fgets (line, LINESIZE, fp);
 
-  // Parse input lines assuming entries are: fund_name value monthly quarterly
+  // Parse input lines assuming entries are: fund_name value mult monthly quarterly
   // If monthly > 0 use that, else quarterly
   while (fgets (line, LINESIZE, fp) != NULL) {
     if (get_fund_name (line, fund_name) < 0)
