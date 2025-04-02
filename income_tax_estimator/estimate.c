@@ -10,9 +10,10 @@ const double kicksinat[NUMYRS][NUMBRACKETS] = {{0.,11., 44.725,95.375, 182.1},
 int main()
 {
   // All dollar-based floating point settings and inputs are in thousands
-  const double std_deduction[NUMYRS] = {15.7, 16.45};
+  const double std_deduction[NUMYRS] = {15.7, 16.55};
   const double taxrate [NUMBRACKETS] = {10., 12., 22., 24., 32.}; // tax rate (%) for each bracket
   const double cgrate = 15.; // Cap gains rate ASSUMED to be this percent
+  const double ssfrac = .85; // Fraction of social security that is taxed
   int idx;               // user input: index into arrays to match "year"
   int year;              // user input: year to estimate federal taxes
   int topbracketidx;     // index of top income bracket
@@ -27,14 +28,19 @@ int main()
   double capg_qdiv;      // capital gains + qualified dividends (assumed taxed at cgrate)
   double agi;            // adjusted gross income (income + ordinary dividends + cap gains)
   double taxable_income; // agi - std deduction
-  double taxed_fromtable;      // taxable_income - capg_qdiv
+  double taxed_fromtable;// taxable_income - capg_qdiv
   double tax;            // estimated federal tax
   double cgtax;          // tax on cap gains+qdiv
+  double ssincome;       // income from social security
+  double fedrebate;      // fed deduction from tax (e.g. heat pump)
+  double fedwh;          // fed withholding
   // CO-specific items
   const double COtaxrate [NUMYRS] = {4.4, 4.25}; // CO tax rate (%) for each year
-  const double ssreduce = 24.;   // Age 65 and above CO allows up to 24K removal of SS+annuity
-  const double maxcharity = 0.5; // CO allows up to $500 chartiable deduction
-  const double tabor[NUMYRS] = {0.8, 0.277}; // 0.277 is for AGI between $105K and $166K
+  double ssreduce;               // Age 65 and above CO doesn't tax ss income
+  const double charity_adj = .5; // CO reduces charitable contributions by this amount
+  double charity;                // CO allows deductions for charitable contributions
+  double COwh;                   // CO withholding
+  const double tabor[NUMYRS] = {0.8, 0.323}; // 0.323 is for AGI between $166K and $233K
   double reductions;             // reductions to income for CO tax purposes
   double COincome;               // income to apply CO tax rate to
   double COtax;                  // CO tax owed
@@ -55,12 +61,19 @@ int main()
   printf ("Estimating federal tax for year=%d\n", year);
   printf ("NOTE: All requested input is expected in floating point thousands of dollars\n");
   
-  printf ("Enter taxable income exclude capgains, dividends and USbonds (maybe 4b+5b+6b of 1040)\n");
+  printf ("Enter taxable income exclude ss, capgains, dividends and USbonds (maybe 4b+5b of 1040)\n");
   if (scanf ("%lf %*s", &income) < 1 || income < 0.) {
     printf ("income not found or negative. Quitting\n");
     return -1;
   }
   printf ("Got income=$%.3lfK\n", income);
+
+  printf ("Enter total social security income\n");
+  if (scanf ("%lf %*s", &ssincome) < 1 || ssincome < 0.) {
+    printf ("social security income not found or negative. Quitting\n");
+    return -1;
+  }
+  printf ("Got social security income=$%.3lfK\n", ssincome);
 
   printf ("Enter income from US bonds ()\n");
   if (scanf ("%lf %*s", &usbondincome) < 1 || usbondincome < 0.) {
@@ -68,7 +81,7 @@ int main()
     return -1;
   }
   printf ("Got US bond income=$%.3lfK\n", usbondincome);
-  income += usbondincome;
+  income += ssfrac*ssincome + usbondincome;
 
   printf ("Enter ordinary dividends (maybe line 3b of 1040)\n");
   if (scanf ("%lf %*s", &odiv) < 1 || odiv < 0.) {
@@ -97,6 +110,34 @@ int main()
     return -1;
   }
   printf ("Got long-term capital gains=$%.3lfK\n\n", longcg);
+
+  printf ("Enter charitable contributions (for now this only applies to CO tax)\n");
+  if (scanf ("%lf %*s", &charity) < 1) {
+    printf ("charity not found. Quitting\n");
+    return -1;
+  }
+  printf ("Got charitable contributions=$%.3lfK\n\n", charity);
+
+  printf ("Enter federal rebates total (to be subtracted from tax owed)\n");
+  if (scanf ("%lf %*s", &fedrebate) < 1) {
+    printf ("fed rebate not found. Quitting\n");
+    return -1;
+  }
+  printf ("Got fed rebates=$%.3lfK\n\n", fedrebate);
+
+  printf ("Enter federal withholding\n");
+  if (scanf ("%lf %*s", &fedwh) < 1) {
+    printf ("federal withholding not found. Quitting\n");
+    return -1;
+  }
+  printf ("Got federal withholding=$%.3lfK\n\n", fedwh);
+
+  printf ("Enter CO withholding\n");
+  if (scanf ("%lf %*s", &COwh) < 1) {
+    printf ("CO withholding not found. Quitting\n");
+    return -1;
+  }
+  printf ("Got CO withholding=$%.3lfK\n\n", COwh);
 
   // Figure rate on capital gains. Some fraction of short-term gains will be taxed as regular
   // income if net gains (short+long) are positive. If both shortcg and longcg are positive,
@@ -171,16 +212,24 @@ int main()
   cgtax = capg_qdiv*0.01*cgrate;
   printf ("tax on cap gains+qdiv=$%.3lfK\n", cgtax);
   tax += cgtax;
-  printf ("federal tax=$%.3lfK\n\n", tax);
+  printf ("federal tax=$%.3lfK\n", tax);
+  tax -= fedrebate;
+  printf ("federal tax after rebates=$%.3lfK\n", tax);
+  printf ("federal check to write (ie after withholding)=$%.3lfK\n\n", tax-fedwh);
 
   // Next: CO state tax calculation
-  reductions = ssreduce + maxcharity + usbondincome;
+  ssreduce   = ssfrac*ssincome;
+  charity   -= fmin (charity - charity_adj, 0.); // CO reduces charity contribs by some amount
+  reductions = ssreduce + charity + usbondincome;
   printf ("CO reductions from taxable_income of $%.3lfK=$%.3lfK\n", taxable_income, reductions);
   COincome   = taxable_income - reductions;
   printf ("CO taxable income=$%.3lfK\n", COincome);
-  COtax      = COincome*0.01*COtaxrate[idx] - tabor[idx];;
+  COtax      = COincome*0.01*COtaxrate[idx];
   printf ("CO tax=$%.3lfK\n", COtax);
-	  
+  COtax -= tabor[idx];
+  printf ("CO tax after Tabor adjustment=$%.3lfK\n", COtax);
+  printf ("CO check to write (ie after withholding)=$%.3lfK\n", COtax-COwh);
+  
   return 0;
 }
 
