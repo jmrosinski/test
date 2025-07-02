@@ -143,8 +143,10 @@ int main ()
 	      100.*inflation, 100.*life_expect_decrease_frac);
     }
   }
-  begassets += assets_annuitized[0]; // Only annuity 0 has an initial value
   // Calculate change of assets (% normalized to 1 year)
+  // ASSUME begassets before annuitization INCLUDED to-be-annuitized amount, and EXCLUDED them
+  // after annuitization (this is how TIAA works). That's why annuity_value added to endassets
+  // above and not to begassets.
   change  = endassets - begassets;
   percent = 100.*(12./months)*change / begassets;
   printf ("Unadjusted assets changed from $%4.1fK to $%4.1fK which is an annualized change of %+4.1f%%\n",
