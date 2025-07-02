@@ -77,7 +77,7 @@ int main ()
   begmo     = atoi (tokens1[3]);
   begcpi    = atof (tokens1[4]);
   begassets = atof (tokens1[5]);
-
+  
   endmo     = atoi (tokens2[3]);
   endcpi    = atof (tokens2[4]);
   endassets = atof (tokens2[5]);
@@ -134,7 +134,7 @@ int main ()
 	                                life_expect[annuity_startage];
       float annuity_value             = assets_annuitized[n] / (1. + inflation);
       annuity_value                  /= 1. + life_expect_decrease_frac;
-                                        
+      
       endassets += annuity_value;
       printf ("Annuity %d init value=%4.1fK estimated to drop to %4.1fK over %d years %d to %d\n",
 	      n, assets_annuitized[n], annuity_value, endyr-annuity_startyr[n],
@@ -143,6 +143,7 @@ int main ()
 	      100.*inflation, 100.*life_expect_decrease_frac);
     }
   }
+  begassets += assets_annuitized[0]; // Only annuity 0 has an initial value
   // Calculate change of assets (% normalized to 1 year)
   change  = endassets - begassets;
   percent = 100.*(12./months)*change / begassets;
