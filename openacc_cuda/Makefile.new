@@ -1,0 +1,28 @@
+CC = gcc-14
+NVCC = nvcc
+NVCCFLAGS = -gencode arch=compute_53,code=compute_53 -lineinfo --ptxas-options=-v -rdc=true
+ifeq ($(CC),gcc-14)
+  CFLAGS = -m64 -fopenacc -foffload=nvptx-none -foffload-options=nvptx-none=-march=sm_53 -fcf-protection=none -fno-stack-protector
+  LINKER = $(CC)
+  LDFLAGS = -m64 -fopenacc
+else
+  CFLAGS = -m64 -acc -Minfo=accel -cuda
+  LINKER = $(CC)
+  LDFLAGS = -v -m64 -acc -cuda
+endif
+
+CPUOBJS = main.o
+GPUOBJS = device.o
+OBJS = $(CPUOBJS) $(GPUOBJS)
+
+all: basic
+
+basic: $(OBJS)
+	$(NVCC) -dlink -o cudaobjs.o $(GPUOBJS)
+	$(LINKER) -o $@ $(CPUOBJS) cudaobjs.o $(LDFLAGS)
+
+%.o: %.cu
+	$(NVCC) -c $(NVCCFLAGS) $<
+
+clean:
+	$(RM) $(OBJS) basic
