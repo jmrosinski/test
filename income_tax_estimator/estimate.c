@@ -2,18 +2,19 @@
 #include <math.h>
 
 #define NUMYRS 3
-#define NUMBRACKETS 5
+#define NUMBRACKETS 6
 const int idx_map[NUMYRS] = {2023,2024,2025}; // supported tax years
-const double kicksinat[NUMYRS][NUMBRACKETS] = {{0.,11., 44.725, 95.375, 182.1  },
-					       {0.,11.6,47.15, 100.525, 191.95 },
-					       {0.,11.9,48.475,103.350, 197.300}};
+const double kicksinat[NUMYRS][NUMBRACKETS] = {{0.,11., 44.725, 95.375, 182.1  ,231.521},
+					       {0.,11.6,47.15, 100.525, 191.95 ,243.726},
+					       {0.,11.9,48.475,103.350, 197.301,250.526}};
 int main()
 {
   // All dollar-based floating point settings and inputs are in thousands
   const double std_deduction[NUMYRS] = {15.7, 16.55, 17.00};
-  const double taxrate [NUMBRACKETS] = {10., 12., 22., 24., 32.}; // tax rate (%) for each bracket
+  const double taxrate [NUMBRACKETS] = {10., 12., 22., 24., 32., 35.}; // tax rate (%) for each bracket
   const double cgrate = 15.; // Cap gains rate ASSUMED to be this percent
   const double ssfrac = .85; // Fraction of social security that is taxed
+  int i;                 // loop index needs to be saved
   int idx;               // user input: index into arrays to match "year"
   int year;              // user input: year to estimate federal taxes
   int topbracketidx;     // index of top income bracket
@@ -201,12 +202,15 @@ int main()
 
   // Loop over tax brackets to figure total tax
   tax = 0.;
-  for (int i = 0; i < NUMBRACKETS-1 && taxable_income >= kicksinat[idx][i]; ++i) {
+  for (i = 0; i < NUMBRACKETS-1 && taxable_income >= kicksinat[idx][i]; ++i) {
     double limit = fmin (kicksinat[idx][i+1], taxable_income);
     tax += (limit - kicksinat[idx][i]) * 0.01*taxrate[i];  // 0.01 converts percent to fraction
     if (taxable_income < kicksinat[idx][i+1])
       break;
   }
+  printf ("taxable_income=$%.3lfK is %.3lfK from bumping into the next bracket of %.0lf%%\n",
+	  taxable_income, kicksinat[idx][i+1] - taxable_income, taxrate[i+1]);
+	  
   printf ("tax on pure income=$%.3lfK\n", tax);
   // Add tax on capital gains+qualified dividends
   cgtax = capg_qdiv*0.01*cgrate;
