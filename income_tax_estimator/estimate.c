@@ -1,16 +1,16 @@
 #include <stdio.h>
 #include <math.h>
 
-#define NUMYRS 2
+#define NUMYRS 3
 #define NUMBRACKETS 5
-const int idx_map[NUMYRS] = {2023,2024}; // supported tax years
-const double kicksinat[NUMYRS][NUMBRACKETS] = {{0.,11., 44.725,95.375, 182.1},
-					       {0.,11.6,47.15, 100.525,191.95}};
-
+const int idx_map[NUMYRS] = {2023,2024,2025}; // supported tax years
+const double kicksinat[NUMYRS][NUMBRACKETS] = {{0.,11., 44.725, 95.375, 182.1  },
+					       {0.,11.6,47.15, 100.525, 191.95 },
+					       {0.,11.9,48.475,103.350, 197.300}};
 int main()
 {
   // All dollar-based floating point settings and inputs are in thousands
-  const double std_deduction[NUMYRS] = {15.7, 16.55};
+  const double std_deduction[NUMYRS] = {15.7, 16.55, 17.00};
   const double taxrate [NUMBRACKETS] = {10., 12., 22., 24., 32.}; // tax rate (%) for each bracket
   const double cgrate = 15.; // Cap gains rate ASSUMED to be this percent
   const double ssfrac = .85; // Fraction of social security that is taxed
@@ -25,22 +25,22 @@ int main()
   double carryover = 0.; // extent to which net capital LOSS exceeds $3K
   double odiv;           // user input: ordinary dividends
   double qdiv;           // user input: qualified dividends
+  double unqdiv;         // odiv - qdiv (unqualified dividends)
   double capg_qdiv;      // capital gains + qualified dividends (assumed taxed at cgrate)
   double agi;            // adjusted gross income (income + ordinary dividends + cap gains)
-  double taxable_income; // agi - std deduction
-  double taxed_fromtable;// taxable_income - capg_qdiv
+  double taxable_income; // agi - std deduction - capg_qdiv
   double tax;            // estimated federal tax
   double cgtax;          // tax on cap gains+qdiv
   double ssincome;       // income from social security
   double fedrebate;      // fed deduction from tax (e.g. heat pump)
   double fedwh;          // fed withholding
   // CO-specific items
-  const double COtaxrate [NUMYRS] = {4.4, 4.25}; // CO tax rate (%) for each year
+  const double COtaxrate [NUMYRS] = {4.4, 4.25, 4.25}; // CO tax rate (%) for each year
   double ssreduce;               // Age 65 and above CO doesn't tax ss income
   const double charity_adj = .5; // CO reduces charitable contributions by this amount
   double charity;                // CO allows deductions for charitable contributions
   double COwh;                   // CO withholding
-  const double tabor[NUMYRS] = {0.8, 0.323}; // 0.323 is for AGI between $166K and $233K
+  const double tabor[NUMYRS] = {0.8, 0.323, 0.}; // 0.323 is for AGI between $166K and $233K
   double reductions;             // reductions to income for CO tax purposes
   double COincome;               // income to apply CO tax rate to
   double COtax;                  // CO tax owed
@@ -175,14 +175,17 @@ int main()
 
   // qdiv must be a positive number, but it's possible capgains+qdiv is negative. Thus fmax()
   capg_qdiv = fmax (0., capgains + qdiv);
-  printf ("cap gains + qualified dividends=$%.3lfK ASSUMED to be taxed at %d%%\n",
+  printf ("cap gains + qualified dividends=$%.3lfK ASSUMED to be federally taxed at %d%%\n",
 	  capg_qdiv, (int) cgrate);
+
+  unqdiv = odiv - qdiv;
+  printf ("unqualified dividends=$%.3lfK federally taxed as regular income\n", unqdiv);
   
   agi = income + odiv + capgains;
   printf ("adjusted gross income=$%.3lfK\n", agi);
   
-  taxable_income = agi - std_deduction[idx];
-  printf ("taxable income before subtracting cg and qdiv=$%.3lfK\n", taxable_income);
+  taxable_income = agi - std_deduction[idx] - capg_qdiv;
+  printf ("taxable income (subtracting cg and qdiv)=$%.3lfK\n", taxable_income);
 
   if ((topbracketidx = get_topbracketidx (idx, taxable_income)) < 0) {
     printf ("Cannot find top tax bracket index. Quitting\n");
@@ -190,21 +193,18 @@ int main()
   }
   printf ("Top tax bracket begins at $%.3lfK\n", kicksinat[idx][topbracketidx]);
 
-  // Remove capg_qdiv from taxable income because rate on capg_qdiv is lower.
-  // It will be added later.
-  taxed_fromtable = taxable_income - capg_qdiv;
-  if (taxed_fromtable > kicksinat[idx][NUMBRACKETS-1]) {
-    printf ("Insufficient brackets:taxed_fromtable=$%.3lfK exceeds top limit of $%.3lfK Quitting\n",
-	    taxed_fromtable, kicksinat[idx][NUMBRACKETS-1]);
+  if (taxable_income > kicksinat[idx][NUMBRACKETS-1]) {
+    printf ("Insufficient brackets:taxable_income=$%.3lfK exceeds top limit of $%.3lfK Quitting\n",
+	    taxable_income, kicksinat[idx][NUMBRACKETS-1]);
     return -1;
   }
 
   // Loop over tax brackets to figure total tax
   tax = 0.;
-  for (int i = 0; i < NUMBRACKETS-1 && taxed_fromtable >= kicksinat[idx][i]; ++i) {
-    double limit = fmin (kicksinat[idx][i+1], taxed_fromtable);
+  for (int i = 0; i < NUMBRACKETS-1 && taxable_income >= kicksinat[idx][i]; ++i) {
+    double limit = fmin (kicksinat[idx][i+1], taxable_income);
     tax += (limit - kicksinat[idx][i]) * 0.01*taxrate[i];  // 0.01 converts percent to fraction
-    if (taxed_fromtable < kicksinat[idx][i+1])
+    if (taxable_income < kicksinat[idx][i+1])
       break;
   }
   printf ("tax on pure income=$%.3lfK\n", tax);
@@ -221,8 +221,10 @@ int main()
   ssreduce   = ssfrac*ssincome;
   charity   -= fmin (charity - charity_adj, 0.); // CO reduces charity contribs by some amount
   reductions = ssreduce + charity + usbondincome;
-  printf ("CO reductions from taxable_income of $%.3lfK=$%.3lfK\n", taxable_income, reductions);
-  COincome   = taxable_income - reductions;
+  printf ("CO reductions to income=$%.3lfK\n", reductions);
+  // CO taxes cap gains and ALL dividends (not just unqualified dividends) as regular income
+  // NOTE taxable_income already INCLUDES unqualified dividends (unqdiv)
+  COincome   = taxable_income + capg_qdiv - reductions;
   printf ("CO taxable income=$%.3lfK\n", COincome);
   COtax      = COincome*0.01*COtaxrate[idx];
   printf ("CO tax=$%.3lfK\n", COtax);
