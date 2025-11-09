@@ -73,7 +73,8 @@ int main ()
     printf ("get9tokens failed\n");
     return 1;
   }
-
+  // tokens[0] will be the first token AFTER the year, because (I think) the first delimiter
+  // (space or tab) occurs AFTER the year
   begmo     = atoi (tokens1[3]);
   begcpi    = atof (tokens1[4]);
   begassets = atof (tokens1[5]);
