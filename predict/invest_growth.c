@@ -104,7 +104,7 @@ int main ()
   printf ("  Additions are spent_inctax=%.1lfK, taxed_rothconv=%.1lfK\n",
 	  spent_inctax, taxed_rothconv);
   printf ("  Total change of %+.1lfK represents an annualized value of %+.1lf%%\n", invest_growth,
-	  (100.*invest_growth)/begassets);
+	  (12./months)*(100.*invest_growth)/begassets);
   return 0;
 }
 
