@@ -13,9 +13,9 @@ int get9tokens (char *, char **);            // parse all tokens from line
 
 int main ()
 {
-  const double tot_taxrate = 0.18; // assumed aggregate total tax rate (fraction)
-  const double top_taxrate = 0.28; // roth_conv * top_taxrate gets added back to invest income
-
+  const double tot_taxrate = 0.18; // aggreate assumed total tax rate across brackets
+  double medicare;                 // $272.70 in 2025, $405.80 in 2026
+  double dcp_refund = .259;        // CSU monthly DCP refund (thousands of $)
   char line[LINESIZE];             // input line
   char yr[5];                      // year of calculation (char)
   int year;                        // year of calculation (int)
@@ -24,14 +24,13 @@ int main ()
   double annualized_inflation;     // calculated inflation rate (fraction)
   int nmo;                         // intermediate number of months
   int months;                      // number of months for calculation
-  double rothconv;                 // total Roth conversions from 1st thru 2nd entries
-  double taxed_rothconv;           // rothconv * top_taxrate
+  double wh;                       // Fed+state withholding, due to IRA conversion, or
+                                   //   money sent manually directly to IRS for taxes
   double spent;                    // total amt spent between 1st and 2nd entries
   double spent_inctax;             // "spent" modified to include income taxed amount
-  double socsec;                   // social security earned between 1st and 2nd entries
-  double annuity;                  // annuity (monthly)
-  double annuity_tot;              // annuity accumulated over months
-  double invest_growth;            // change modified by socsc, annunity, expenses, Roth
+  double socsec;                   // social security income (input before taxes)
+  double annuity;                  // annuity (monthly), will get modified 
+  double invest_growth;            // change modified by socsc, annunity, expenses, IRA conv
 
   // These are parsed from input file
   int begmo, endmo;                // begin and end month of year
@@ -49,9 +48,21 @@ int main ()
     printf ("beg year must be >= 2020\n");
     return 1;
   }
+  
+  switch (year) {
+  case 2025: medicare = .27270;
+    break;
+  case 2026: medicare = .40580; // much higher than 2025 due to IRMAA
+    break;
+  default:
+    printf ("Enter monthly medicare premium (thousands of $) for year=%d\n", year);
+    scanf ("%lf", &medicare);
+  }  
 
-  printf ("Enter total Roth conversion (thousands of $) for year=%d\n", year);
-  scanf ("%lf", &rothconv);
+  printf ("Enter total fed+state withholding plus direct IRS payments (thousands of $) for year=%d\n",
+	  year);
+  printf ("  This will be assumed to account for income taxes owed\n");
+  scanf ("%lf", &wh);
 
   // Open required input file
   if ((fp = fopen ("./yearly_data", "r")) == NULL) {
@@ -74,16 +85,24 @@ int main ()
   }
   // tokens[0] will be the first token AFTER the year, because (I think) the first delimiter
   // (space or tab) occurs AFTER the year
-  begmo     = atoi (tokens[0]);
-  begcpi    = atof (tokens[1]);
-  begassets = atof (tokens[2]);
-  endmo     = atoi (tokens[3]);
-  endcpi    = atof (tokens[4]);
-  endassets = atof (tokens[5]);
-  spent     = atof (tokens[6]);
-  annuity   = atof (tokens[7]);         // ASSUME annuity is constant across years
-  months    = endmo - begmo + 1;        // total number of months
-  socsec    = months*atof (tokens[8]);  // total social security income
+  begmo       = atoi (tokens[0]);
+  begcpi      = atof (tokens[1]);
+  begassets   = atof (tokens[2]);
+  endmo       = atoi (tokens[3]);
+  endcpi      = atof (tokens[4]);
+  endassets   = atof (tokens[5]);
+  spent       = atof (tokens[6]);
+  annuity     = atof (tokens[7]);        // ASSUME annuity is constant across years
+  socsec      = atof (tokens[8]);        // monthly social security income
+
+  months      = endmo - begmo + 1;       // total number of months
+
+  // Convert monthly values to yearly, and modify if necessary, e.g. for medicare
+  annuity    *= months;
+  // Remove monthly medicare premium from socsec
+  socsec     -= medicare;
+  socsec     *= months;
+  dcp_refund *= months;                  // this refund will be subtracted from invest_growth
 
   total_inflation      = (endcpi - begcpi) /  begcpi;
   annualized_inflation = total_inflation * (12./months);
@@ -92,18 +111,20 @@ int main ()
   printf ("Total inflation for year %d month %d through month %d was %5.2f%%\n",
 	  year, begmo, endmo, 100.*total_inflation);
 
-  annuity_tot    = annuity*months;
-  spent_inctax   = spent*(1. + tot_taxrate);
-  taxed_rothconv = rothconv*top_taxrate;
-  change         = endassets - begassets;
-  invest_growth  = change - annuity_tot - socsec + spent_inctax + taxed_rothconv;
+  spent_inctax   = spent*(1. + tot_taxrate); // money spent (added to income)
+  change         = endassets - begassets;    // total change in assets
+  // annuity, social security and dcp_refund income get subtracted from asset change since 
+  //   they are not "investments"
+  // money spent (plus est. taxes) gets added back to asset change since it was taken from assets
+  // Fed+state WH from IRA assets converted or IRS payments also treated as "money spent"
+  invest_growth  = change - annuity - socsec - dcp_refund + spent_inctax + wh;
   printf ("Investment change year=%d mo=%d through mo=%d is %+.1lfK\n",
 	  year, begmo, endmo, change);
-  printf ("To estimate investment growth, subtractions from change are annuity=%.1lfK, "
-	  "social security=%.1lfK\n", annuity_tot, socsec);
-  printf ("  Additions are spent_inctax=%.1lfK, taxed_rothconv=%.1lfK\n",
-	  spent_inctax, taxed_rothconv);
-  printf ("  Total change of %+.1lfK represents an annualized value of %+.1lf%%\n", invest_growth,
+  printf ("To estimate investment growth, subtractions from change are annuity=%.3lfK, "
+	  "social security=%.3lfK and dcp_refund=%.3lfK\n", annuity, socsec, dcp_refund);
+  printf ("  Additions are spent_inctax=%.3lfK, withholding=%.3lfK\n",
+	  spent_inctax, wh);
+  printf ("  Total change of %+.3lfK represents an annualized value of %+.3lf%%\n", invest_growth,
 	  (12./months)*(100.*invest_growth)/begassets);
   return 0;
 }
