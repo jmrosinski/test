@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -c -g
+CFLAGS = -c -g -Wall
 LDFLAGS = -lm
 OBJS1 = predict.o
 OBJS2 = change.o

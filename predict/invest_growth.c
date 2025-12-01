@@ -3,74 +3,80 @@
 #include <string.h>  // memset and string functions
 #include <math.h>
 
-// Estimate change in invested assets from one point to another in the file yearly_data
-// Include estimate of change in value for annuities that have begun but whose
-// source doesn't provide current value info to the customer, e.g. TIAA
+// Estimate investment growth for a given year (2020-present).
+// "diff" = "spent" - "fixed_income": fraction of "spent" which came from investments
+//   If negative, some of fixed_income actually got added to investments.
+// "delta_tax_april" = "tax_prvyr" - "tax_nxtyr"
+//   Changes invest_growth since taxes paid April current year actually should have been
+//     paid from assets in the previous year.
+// Invest_growth = net_worth_growth + diff + delta_tax_april.
+//   diff positive means some of money spent came from investments, so adds back to Invest_growth
+//   diff negative means some of fixed_income ended in investments, so subtracts from Invest_growth
+//   Note delta_tax_april can be positive or negative
 
-#define LINESIZE 128  // max size of input line
-
-int get9tokens (char *, char **);            // parse all tokens from line
+#define LINESIZE 128  // max size of input line pulled from file "yearly_data"
+#define NUMYRS 7
+const int idx_map[NUMYRS] = {2020,2021,2022,2023,2024,2025,2026}; // supported tax years
 
 int main ()
 {
-  const double tot_taxrate = 0.18; // aggreate assumed total tax rate across brackets
-  double medicare;                 // $272.70 in 2025, $405.80 in 2026
-  double dcp_refund = .259;        // CSU monthly DCP refund (thousands of $)
+  int get9tokens (char *, char **); // parse all tokens from line
+  int get_yridx (int);              // retrieve array index corresponding to year
+
+  const char *infile = "yearly_data";
+  // Retired June, 2020. Annuity interest only started July, 2020. "annuity" monthly 
+  //   income therefore averaged over 12 months. Varied somewhat month to month
+  // Started social security June, 2021. 1186. = 2033.*(7/12)
+  // Turned 65 May, 2023. Began medicare, premiums taken from social security.
+  //   Subsequent years ss income decreased due to IRMAA, which explains ss decrease in 2023
+  //   IRMAA explains the decreases in 2025, 2026 as I became more aggressive in doing Roth
+  //   conversions.
+  const double unk = -99999.;  // unknown value
+  // socsec, annuity, and dcp_refund are the MONTHLY amounts put into checking acct, in other words
+  //   AFTER withholding or medicare. These numbers will get converted to yearly values
+  double socsec[NUMYRS] =     {0.,   1186., 2152., 2127., 2240., 1938., 1848.};
+  double annuity[NUMYRS] =    {659., 1080., 1338., 1557., 1912., 1925., 1920.};
+  double dcp_refund[NUMYRS] = {84.,  84.,   84.,   259.,  259.,  259.,  259.};
+  // tax_prvyr are the fed+state amount sent to gov't that apply to the PREVIOUS year
+  double tax_prvyr[NUMYRS] = {unk,  8693., 5007., 3699., 5076., 11838., unk};
+  int idx, idxp1;                  // year (and year+1) index into socsec, annuity, dcp_refund
   char line[LINESIZE];             // input line
   char yr[5];                      // year of calculation (char)
   int year;                        // year of calculation (int)
   FILE *fp;                        // file pointer
   double total_inflation;          // calculated inflation rate (fraction)
   double annualized_inflation;     // calculated inflation rate (fraction)
-  int nmo;                         // intermediate number of months
-  int months;                      // number of months for calculation
-  double wh;                       // Fed+state withholding, due to IRA conversion, or
-                                   //   money sent manually directly to IRS for taxes
-  double spent;                    // total amt spent between 1st and 2nd entries
-  double spent_inctax;             // "spent" modified to include income taxed amount
-  double socsec;                   // social security income (input before taxes)
-  double annuity;                  // annuity (monthly), will get modified 
+  int months;                      // number of months for calculation (likely < 12 for current yr)
+  double spent;                    // total amt spent during the year
+  double change;                   // change in asset value
   double invest_growth;            // change modified by socsc, annunity, expenses, IRA conv
+  double fixed_income;             // socsec + annuity + dcp_refund for the year in question
+  double diff;                     // spent - fixed_income
+  double delta_tax_april;          // difference between tax checks written year - year+1
 
   // These are parsed from input file
   int begmo, endmo;                // begin and end month of year
   double begcpi, endcpi;           // CPI for beginning and ending times
   double begassets, endassets;     // assets (thousands) at end of 1st and 2nd entries
-  double change;                   // change in asset value
-  char *tokens[9];                 // useful data from line
+  char *tokens[9];                 // data items from relevant line of file
 
   // Read through entries, skipping those that don't start with a digit
   printf ("Enter year of calculation\n");
   scanf ("%s", yr);
 
   year = atoi (yr);
-  if (year < 2020) {
-    printf ("beg year must be >= 2020\n");
-    return 1;
+  if ((idx = get_yridx (year)) < 0) {
+    printf ("index for year=%d not found. Quitting\n", year);
+    return -1;
   }
-  
-  switch (year) {
-  case 2025: medicare = .27270;
-    break;
-  case 2026: medicare = .40580; // much higher than 2025 due to IRMAA
-    break;
-  default:
-    printf ("Enter monthly medicare premium (thousands of $) for year=%d\n", year);
-    scanf ("%lf", &medicare);
-  }  
-
-  printf ("Enter total fed+state withholding plus direct IRS payments (thousands of $) for year=%d\n",
-	  year);
-  printf ("  This will be assumed to account for income taxes owed\n");
-  scanf ("%lf", &wh);
 
   // Open required input file
-  if ((fp = fopen ("./yearly_data", "r")) == NULL) {
-    printf ("cannot open input file yearly_data\n");
+  if ((fp = fopen (infile, "r")) == NULL) {
+    printf ("cannot open input file %s\n", infile);
     return 1;
   }
 
-  // Read through input file1 until desired start line is found
+  // Read through input infile until desired start line is found
   do {
     memset (line, 0, LINESIZE);
     if (fgets (line, LINESIZE, fp) == NULL) {
@@ -80,7 +86,7 @@ int main ()
   } while (strncmp (line, yr, 4) != 0);
 
   if (get9tokens (line, tokens) < 0) {
-    printf ("get9tokens1 failed\n");
+    printf ("get9tokens failed\n");
     return 1;
   }
   // tokens[0] will be the first token AFTER the year, because (I think) the first delimiter
@@ -92,39 +98,55 @@ int main ()
   endcpi      = atof (tokens[4]);
   endassets   = atof (tokens[5]);
   spent       = atof (tokens[6]);
-  annuity     = atof (tokens[7]);        // ASSUME annuity is constant across years
-  socsec      = atof (tokens[8]);        // monthly social security income
 
-  months      = endmo - begmo + 1;       // total number of months
+  months      = endmo - begmo + 1;     // total number of months
 
-  // Convert monthly values to yearly, and modify if necessary, e.g. for medicare
-  annuity    *= months;
-  // Remove monthly medicare premium from socsec
-  socsec     -= medicare;
-  socsec     *= months;
-  dcp_refund *= months;                  // this refund will be subtracted from invest_growth
+  // For relevant items, convert array value from $ to thousands of $,
+  // and convert from monthly to yearly (or "so far this year" if months < 12)
+  socsec[idx]     *= months*.001;
+  annuity[idx]    *= months*.001;
+  dcp_refund[idx] *= months*.001;
+  if ((idxp1 = get_yridx (year+1)) < 0) {
+    delta_tax_april = .001*tax_prvyr[idx];;
+    printf ("index for year+1=%d not found. Assuming 0 fed+state tax check written for year=%d\n",
+	    year+1, year);
+  } else if (tax_prvyr[idxp1] == unk) {
+    delta_tax_april = .001*tax_prvyr[idx];
+    printf ("fed+state tax check written for year+1=%d is unknown. Assuming 0\n", year+1);
+  } else {
+    delta_tax_april = .001*(tax_prvyr[idx] - tax_prvyr[idxp1]);
+    printf ("difference in tax check written for year=%d and year+1=%d is $%+.3lfK\n",
+	    year, year+1, delta_tax_april);
+  }
 
   total_inflation      = (endcpi - begcpi) /  begcpi;
   annualized_inflation = total_inflation * (12./months);
-  printf ("Annualized inflation for year %d month %d through month %d was %5.2f%%\n",
-	  year, begmo, endmo, 100.*annualized_inflation);
-  printf ("Total inflation for year %d month %d through month %d was %5.2f%%\n",
+  printf ("Total inflation for year %d month %d through month %d was %5.2lf%%\n",
 	  year, begmo, endmo, 100.*total_inflation);
+  printf ("Annualized inflation for year %d month %d through month %d was %5.2lf%%\n",
+	  year, begmo, endmo, 100.*annualized_inflation);
 
-  spent_inctax   = spent*(1. + tot_taxrate); // money spent (added to income)
-  change         = endassets - begassets;    // total change in assets
+  change = endassets - begassets;    // total change in assets
+
+  printf ("\nResults for calendar year %d month %d through month %d:\n", year, begmo, endmo);
+  printf ("Raw investments change: $%+.1lfK\n", change);
   // annuity, social security and dcp_refund income get subtracted from asset change since 
-  //   they are not "investments"
-  // money spent (plus est. taxes) gets added back to asset change since it was taken from assets
-  // Fed+state WH from IRA assets converted or IRS payments also treated as "money spent"
-  invest_growth  = change - annuity - socsec - dcp_refund + spent_inctax + wh;
-  printf ("Investment change year=%d mo=%d through mo=%d is %+.1lfK\n",
-	  year, begmo, endmo, change);
-  printf ("To estimate investment growth, subtractions from change are annuity=%.3lfK, "
-	  "social security=%.3lfK and dcp_refund=%.3lfK\n", annuity, socsec, dcp_refund);
-  printf ("  Additions are spent_inctax=%.3lfK, withholding=%.3lfK\n",
-	  spent_inctax, wh);
-  printf ("  Total change of %+.3lfK represents an annualized value of %+.3lf%%\n", invest_growth,
+  //   they are fixed income not investments
+  fixed_income = annuity[idx] + socsec[idx] + dcp_refund[idx];
+  printf ("fixed_income (annuity + socsec + dcp_refund): $%.3lfK\n", fixed_income);
+  // if spent exceeds fixed_income, increase invest_growth by the difference since the excess of
+  //   spent over fixed_income came from investments
+  // if fixed_income exceeds spent, decrease invest_growth by the difference since the excess of
+  //   fixed_income over spent got added to investments, which is not considered "growth"
+  diff = spent - fixed_income;
+  printf ("difference between spent and fixed income: $%+.3lfK\n", diff);
+
+  printf ("Diff bet tax paid this year for prv year and tax paid next year for this year:"
+	  "$%+.3lfK\n", delta_tax_april);
+  invest_growth = change + diff + delta_tax_april;
+  printf ("Estimated investment growth (change + diff + delta_tax_april): $%+.1lfK\n",
+	  invest_growth);
+  printf ("  Investment growth estimate as yearly change: $%+.3lf%%\n",
 	  (12./months)*(100.*invest_growth)/begassets);
   return 0;
 }
@@ -143,4 +165,13 @@ int get9tokens (char *str, char **tokens)
   if (!(tokens[7] = strtok(NULL, delim))) return -1;
   if (!(tokens[8] = strtok(NULL, delim))) return -1;
   return 0;
+}
+
+int get_yridx (int year)
+{
+  for (int i=0; i<NUMYRS; ++i) {
+    if (idx_map[i] == year)
+      return i;
+  }
+  return -1;  // not found
 }
