@@ -20,8 +20,8 @@ const int idx_map[NUMYRS] = {2020,2021,2022,2023,2024,2025,2026}; // supported t
 
 int main ()
 {
-  int get9tokens (char *, char **); // parse all tokens from line
-  int get_yridx (int);              // retrieve array index corresponding to year
+  int get10tokens (char *, char **); // parse all tokens from line
+  int get_yridx (int);               // retrieve array index corresponding to year
 
   const char *infile = "yearly_data";
   // Retired June, 2020. Annuity interest only started July, 2020. "annuity" monthly 
@@ -45,7 +45,6 @@ int main ()
   int year;                        // year of calculation (int)
   FILE *fp;                        // file pointer
   double total_inflation;          // calculated inflation rate (fraction)
-  double annualized_inflation;     // calculated inflation rate (fraction)
   int months;                      // number of months for calculation (likely < 12 for current yr)
   double spent;                    // total amt spent during the year
   double change;                   // change in asset value
@@ -53,6 +52,7 @@ int main ()
   double fixed_income;             // socsec + annuity + dcp_refund for the year in question
   double diff;                     // spent - fixed_income
   double delta_tax_april;          // difference between tax checks written year - year+1
+  double delta_sp500;              // change in s&p500 for that year
 
   // These are parsed from input file
   int begmo, endmo;                // begin and end month of year
@@ -85,8 +85,8 @@ int main ()
     }
   } while (strncmp (line, yr, 4) != 0);
 
-  if (get9tokens (line, tokens) < 0) {
-    printf ("get9tokens failed\n");
+  if (get10tokens (line, tokens) < 0) {
+    printf ("get10tokens failed\n");
     return 1;
   }
   // tokens[0] will be the first token AFTER the year, because (I think) the first delimiter
@@ -98,6 +98,7 @@ int main ()
   endcpi      = atof (tokens[4]);
   endassets   = atof (tokens[5]);
   spent       = atof (tokens[6]);
+  delta_sp500 = atof (tokens[9]);
 
   months      = endmo - begmo + 1;     // total number of months
 
@@ -115,18 +116,23 @@ int main ()
     printf ("fed+state tax check written for year+1=%d is unknown. Assuming 0\n", year+1);
   } else {
     delta_tax_april = .001*(tax_prvyr[idx] - tax_prvyr[idxp1]);
-    printf ("difference in tax check written for year=%d and year+1=%d is $%+.3lfK\n",
-	    year, year+1, delta_tax_april);
   }
 
   total_inflation      = (endcpi - begcpi) /  begcpi;
-  annualized_inflation = total_inflation * (12./months);
   printf ("Total inflation for year %d month %d through month %d was %5.2lf%%\n",
 	  year, begmo, endmo, 100.*total_inflation);
-  printf ("Annualized inflation for year %d month %d through month %d was %5.2lf%%\n",
-	  year, begmo, endmo, 100.*annualized_inflation);
+  if (months != 12) {
+    double annualized_inflation = total_inflation * (12./months);
+    printf ("Annualized inflation for year %d month %d through month %d was %5.2lf%%\n",
+	    year, begmo, endmo, 100.*annualized_inflation);
+  }
 
   change = endassets - begassets;    // total change in assets
+  if (year == 2023) {
+    printf ("In Sept. 2023 TIAA annuity was zeroed and changed to lifetime monthly stipend.\n"
+	    "  Adding 306. to asset change (change) to account for this\n");
+    change += 306.;
+  }
 
   printf ("\nResults for calendar year %d month %d through month %d:\n", year, begmo, endmo);
   printf ("Raw investments change: $%+.1lfK\n", change);
@@ -139,19 +145,22 @@ int main ()
   // if fixed_income exceeds spent, decrease invest_growth by the difference since the excess of
   //   fixed_income over spent got added to investments, which is not considered "growth"
   diff = spent - fixed_income;
-  printf ("difference between spent and fixed income: $%+.3lfK\n", diff);
+  printf ("Diff (diff) between spent and fixed income: $%+.3lfK\n", diff);
 
-  printf ("Diff bet tax paid this year for prv year and tax paid next year for this year:"
-	  "$%+.3lfK\n", delta_tax_april);
+  printf ("Diff (delta_tax_april) bet tax paid this year for prv year and tax paid next year for "
+	  "this year: $%+.3lfK\n", delta_tax_april);
   invest_growth = change + diff + delta_tax_april;
-  printf ("Estimated investment growth (change + diff + delta_tax_april): $%+.1lfK\n",
-	  invest_growth);
-  printf ("  Investment growth estimate as yearly change: $%+.3lf%%\n",
-	  (12./months)*(100.*invest_growth)/begassets);
+  
+  printf ("Estimated investment growth (change + diff + delta_tax_april): $%+.1lfK or %.1lf%%\n",
+	  invest_growth, (100.*invest_growth)/begassets);
+  if (months < 12)
+    printf ("  Investment growth estimate as yearly change: $%+.3lf%%\n",
+	    (12./months)*(100.*invest_growth)/begassets);
+  printf ("Change in S&P500 over %d months: %+.2lf%%\n", months, delta_sp500);
   return 0;
 }
 
-int get9tokens (char *str, char **tokens)
+int get10tokens (char *str, char **tokens)
 {
   const char *delim = " \t";
   strtok (str, delim);
@@ -164,6 +173,7 @@ int get9tokens (char *str, char **tokens)
   if (!(tokens[6] = strtok(NULL, delim))) return -1;
   if (!(tokens[7] = strtok(NULL, delim))) return -1;
   if (!(tokens[8] = strtok(NULL, delim))) return -1;
+  if (!(tokens[9] = strtok(NULL, delim))) return -1;
   return 0;
 }
 
