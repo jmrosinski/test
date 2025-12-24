@@ -10,7 +10,8 @@ const double kicksinat[NUMYRS][NUMBRACKETS] = {{0.,11., 44.725, 95.375, 182.1  ,
 int main()
 {
   // All dollar-based floating point settings and inputs are in thousands
-  const double std_deduction[NUMYRS] = {15.7, 16.55, 17.00};
+  // std_deduction numbers assumes income exceeds threshhold thus the bonus $6K doesn't apply
+  const double std_deduction[NUMYRS] = {15.7, 16.55, 17.75};           // Assumes age 65+
   const double taxrate [NUMBRACKETS] = {10., 12., 22., 24., 32., 35.}; // tax rate (%) for each bracket
   const double cgrate = 15.; // Cap gains rate ASSUMED to be this percent
   const double ssfrac = .85; // Fraction of social security that is taxed
