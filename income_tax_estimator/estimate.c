@@ -36,7 +36,7 @@ int main()
   double fedrebate;      // fed deduction from tax (e.g. heat pump)
   double fedwh;          // fed withholding
   // CO-specific items
-  const double COtaxrate [NUMYRS] = {4.4, 4.25, 4.25}; // CO tax rate (%) for each year
+  const double COtaxrate [NUMYRS] = {4.4, 4.25, 4.4}; // CO tax rate (%) for each year
   double ssreduce;               // Age 65 and above CO doesn't tax ss income
   const double charity_adj = .5; // CO reduces charitable contributions by this amount
   double charity;                // CO allows deductions for charitable contributions
@@ -184,9 +184,11 @@ int main()
   
   agi = income + odiv + capgains;
   printf ("adjusted gross income=$%.3lfK\n", agi);
-  
+
+  // NOTE taxable income INCLUDES unqdiv (unqualified dividends)
   taxable_income = agi - std_deduction[idx] - capg_qdiv;
-  printf ("taxable income (subtracting cg and qdiv)=$%.3lfK\n", taxable_income);
+  printf ("taxable income (subtracting std deduction ($%.3lfK), cg+qdiv($%.3lfK))=$%.3lfK\n",
+	  std_deduction[idx], capg_qdiv, taxable_income);
 
   if ((topbracketidx = get_topbracketidx (idx, taxable_income)) < 0) {
     printf ("Cannot find top tax bracket index. Quitting\n");
