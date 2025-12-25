@@ -1,9 +1,34 @@
 #include <stdio.h>
 #include <math.h>
 
+// Purpose: Estimate fed and state taxes owed for a given year. Also calculate size of check to
+//   write to fed and state, given how much has been withheld.
+// Though the code asks for user input, it's easiest to put these entries into a file, then run
+//   ./.estimate < [input_file]
+// User-supplied input file consistently requires floating point thousands of $
+// Assumptions:
+//   User takes standard deduction rather than itemizing.
+//   Age 65+ is embedded in std_deduction[]. For other ages, just adjust this percentage
+//   Charitable deductions apply only to state income tax. 
+//   AMT doesn't apply. If it does apply, additional code will have to be written to account for it
+//   State is Colorado. For others, rewrite code after the comment // Next: CO state tax calculation
+//   Tax years 2023-2025 are supported. Adding a year just requires increasing NUMYRS and filling
+//     idx_map[], kicksinat[][] and std_deduction[] entries.
+//   Top fed bracket supported is kicksinat[][NUMBRACKETS-2]. The value for [NUMBRACKETS-1] exists
+//     in order to show how far you are from hitting the next higher bracket.
+//   Cap gains and qualified deductions rates are assumed to be 15%. If this is incorrect for
+//     a given user, additional code must be written to account for it (yuck).
+//   In 2025 a "bonus" to the standard deduction was added, but phases out above certain income
+//     levels. It is ASSUMED that the user doesn't qualify for the bonus. Code would have to be
+//     written to account for the phaseout (yuck).
+//   Only taxable income (including social security), short and long cap gains, ordinary and
+//     qualified dividends, US bond income, charity contributions, and qualified rebates are
+//     considered. If other significant tax issues apply, code must be added to account for it
+
 #define NUMYRS 3
 #define NUMBRACKETS 6
 const int idx_map[NUMYRS] = {2023,2024,2025}; // supported tax years
+// kicksinat[][] is the income (thousands of $) at which the bracket starts  
 const double kicksinat[NUMYRS][NUMBRACKETS] = {{0.,11., 44.725, 95.375, 182.1  ,231.521},
 					       {0.,11.6,47.15, 100.525, 191.95 ,243.726},
 					       {0.,11.9,48.475,103.350, 197.301,250.526}};
@@ -13,8 +38,9 @@ int main()
   // std_deduction numbers assumes income exceeds threshhold thus the bonus $6K doesn't apply
   const double std_deduction[NUMYRS] = {15.7, 16.55, 17.75};           // Assumes age 65+
   const double taxrate [NUMBRACKETS] = {10., 12., 22., 24., 32., 35.}; // tax rate (%) for each bracket
-  const double cgrate = 15.; // Cap gains rate ASSUMED to be this percent
-  const double ssfrac = .85; // Fraction of social security that is taxed
+  const double cgfrac = .15;    // Cap gains rate (fraction)
+  const double ssfrac = .85;    // Fraction of social security that is taxed
+  const double cg_losslim = 3.; // IRS limits net capital loss to $3K
   int i;                 // loop index needs to be saved
   int idx;               // user input: index into arrays to match "year"
   int year;              // user input: year to estimate federal taxes
@@ -28,7 +54,7 @@ int main()
   double odiv;           // user input: ordinary dividends
   double qdiv;           // user input: qualified dividends
   double unqdiv;         // odiv - qdiv (unqualified dividends)
-  double capg_qdiv;      // capital gains + qualified dividends (assumed taxed at cgrate)
+  double capg_qdiv;      // capital gains + qualified dividends (assumed taxed at cgfrac)
   double agi;            // adjusted gross income (income + ordinary dividends + cap gains)
   double taxable_income; // agi - std deduction - capg_qdiv
   double tax;            // estimated federal tax
@@ -39,7 +65,7 @@ int main()
   // CO-specific items
   const double COtaxrate [NUMYRS] = {4.4, 4.25, 4.4}; // CO tax rate (%) for each year
   double ssreduce;               // Age 65 and above CO doesn't tax ss income
-  const double charity_adj = .5; // CO reduces charitable contributions by this amount
+  const double charity_adj = .5; // CO reduces charitable contributions by this amount (thousand $)
   double charity;                // CO allows deductions for charitable contributions
   double COwh;                   // CO withholding
   const double tabor[NUMYRS] = {0.8, 0.323, 0.}; // 0.323 is for AGI between $166K and $233K
@@ -147,16 +173,16 @@ int main()
   // If net cap losses exceed $3K, only the $3K will be counted this year and carried over to the
   // next year.
   
-  if (shortcg > 0. && longcg > 0.) {
+  if (shortcg >= 0. && longcg >= 0.) {
     income  += shortcg;
     capgains = longcg;
     printf ("shortcg and longcg are both gains: shortcg=income, longcg taxed at cgrate=%d%%\n",
-	    (int) cgrate);
-  } else {                    // at least one of, maybe both of shortcg, longcg are negative
+	    (int) (cgfrac*100.));
+  } else {                    // at least one of shortcg, longcg is negative
     capgains = shortcg + longcg;
-    if (capgains > 0.) {      // one of shortcg, longcg is positive, the other negative
-      printf ("Net capgains positive due to shortcg=$%.3lfK, longcg=$%.3lfK\n", shortcg, longcg);
-      if (shortcg > longcg) { // shortcg is the positive one so add the net to income
+    if (capgains >= 0.) {      // one of shortcg, longcg is negative, the other non-negative
+      printf ("Net capgains non-negative due to shortcg=$%.3lfK, longcg=$%.3lfK\n", shortcg, longcg);
+      if (shortcg > longcg) { // shortcg is non-negative, longcg negative, so add the net to income
 	income += capgains;
 	// I THINK it's right to zero capgains here: It's been added to income so it shouldn't be
 	// included in the capg_qdiv calculation below this bunch of nested "if" stuff
@@ -168,8 +194,8 @@ int main()
     } else { // capgains < 0:Doesn't matter whether both or just one of shortcg, longcg are negative
       printf ("cgloss=$%.3lfK due to shortcg=$%.3lfK longcg=$%.3lfK\n",
 	      capgains, shortcg, longcg);
-      carryover = fabs (fmin (0., capgains + 3.));  // make "carryover" a non-negative number
-      capgains  = fmax (capgains, -3.);             // negative net gains cannont exceed $3K
+      carryover = fabs (fmin (0., capgains + cg_losslim)); // make "carryover" a non-negative number
+      capgains  = fmax (capgains, -cg_losslim);            // negative net gains cannont exceed $3K
       printf ("  $%.3lfK will be treated as a loss and subtracted from income\n", capgains);
       printf ("  $%.3lfK will be carried over to the next year\n", carryover);
     }
@@ -178,7 +204,7 @@ int main()
   // qdiv must be a positive number, but it's possible capgains+qdiv is negative. Thus fmax()
   capg_qdiv = fmax (0., capgains + qdiv);
   printf ("cap gains + qualified dividends=$%.3lfK ASSUMED to be federally taxed at %d%%\n",
-	  capg_qdiv, (int) cgrate);
+	  capg_qdiv, (int) (cgfrac*100.));
 
   unqdiv = odiv - qdiv;
   printf ("unqualified dividends=$%.3lfK federally taxed as regular income\n", unqdiv);
@@ -216,7 +242,7 @@ int main()
 	  
   printf ("tax on pure income=$%.3lfK\n", tax);
   // Add tax on capital gains+qualified dividends
-  cgtax = capg_qdiv*0.01*cgrate;
+  cgtax = capg_qdiv*cgfrac;
   printf ("tax on cap gains+qdiv=$%.3lfK\n", cgtax);
   tax += cgtax;
   printf ("federal tax=$%.3lfK\n", tax);
