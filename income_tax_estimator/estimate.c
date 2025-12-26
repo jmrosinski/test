@@ -46,6 +46,7 @@ int main()
   int year;              // user input: year to estimate federal taxes
   int topbracketidx;     // index of top income bracket
   double income;         // user input: taxable income (not including US bond income)
+  double ira;            // IRA distributions total (just for comparison to income)
   double usbondincome;   // income from USbonds. NOTE: CO doesn't tax US bond income
   double shortcg;        // user input: short-term capital gains
   double longcg;         // user input: long-term capital gains
@@ -95,6 +96,13 @@ int main()
     return -1;
   }
   printf ("Got income=$%.3lfK\n", income);
+
+  printf ("Enter IRA distributions (subset of taxable income)\n");
+  if (scanf ("%lf %*s", &ira) < 1 || ira < 0. || ira > income) {
+    printf ("income not found, negative, or exceeds total income. Quitting\n");
+    return -1;
+  }
+  printf ("Got ira distributions=$%.3lfK\n", ira);
 
   printf ("Enter total social security income\n");
   if (scanf ("%lf %*s", &ssincome) < 1 || ssincome < 0.) {
@@ -208,20 +216,24 @@ int main()
 
   unqdiv = odiv - qdiv;
   printf ("unqualified dividends=$%.3lfK federally taxed as regular income\n", unqdiv);
+  printf ("IRA ($%.3lfK) portion of income to be taxed off rate table ($%.3lfK) is %.1lf%%\n",
+	  ira, income+unqdiv, 100.*(ira/(income+unqdiv)));
   
   agi = income + odiv + capgains;
   printf ("adjusted gross income=$%.3lfK\n", agi);
+  printf ("capgains+qdiv (%.3lfK) portion of AGI is %.1lf%%\n", capg_qdiv, 100.*(capg_qdiv/agi));
 
   // NOTE taxable income INCLUDES unqdiv (unqualified dividends)
   taxable_income = agi - std_deduction[idx] - capg_qdiv;
-  printf ("taxable income (subtracting std deduction ($%.3lfK), cg+qdiv($%.3lfK))=$%.3lfK\n",
+  printf ("taxable income, subtracting std deduction ($%.3lfK) and cg+qdiv($%.3lfK)=$%.3lfK\n",
 	  std_deduction[idx], capg_qdiv, taxable_income);
 
   if ((topbracketidx = get_topbracketidx (idx, taxable_income)) < 0) {
     printf ("Cannot find top tax bracket index. Quitting\n");
     return -1;
   }
-  printf ("Top tax bracket begins at $%.3lfK\n", kicksinat[idx][topbracketidx]);
+  printf ("Your top tax bracket (%.0lf%%) begins at $%.3lfK\n",
+	  taxrate[topbracketidx], kicksinat[idx][topbracketidx]);
 
   if (taxable_income > kicksinat[idx][NUMBRACKETS-1]) {
     printf ("Insufficient brackets:taxable_income=$%.3lfK exceeds top limit of $%.3lfK Quitting\n",
