@@ -188,12 +188,12 @@ int main()
 	    (int) (cgfrac*100.));
   } else {                    // at least one of shortcg, longcg is negative
     capgains = shortcg + longcg;
-    if (capgains >= 0.) {      // one of shortcg, longcg is negative, the other non-negative
+    if (capgains >= 0.) {     // one of shortcg, longcg is negative, the other non-negative
       printf ("Net capgains non-negative due to shortcg=$%.3lfK, longcg=$%.3lfK\n", shortcg, longcg);
       if (shortcg > longcg) { // shortcg is non-negative, longcg negative, so add the net to income
 	income += capgains;
-	// I THINK it's right to zero capgains here: It's been added to income so it shouldn't be
-	// included in the capg_qdiv calculation below this bunch of nested "if" stuff
+	// Zero capgains here: It's been added to income so it shouldn't be included in the
+	// capg_qdiv calculation below this bunch of nested "if" stuff
 	capgains = 0.;
 	printf ("    income increased to $%.3lfK\n", income);
       } else {                // longcg is the positive one so leave as is and tax the net at cgrate
