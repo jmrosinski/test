@@ -4,9 +4,14 @@
 #include <math.h>
 
 // Estimate investment growth for a given year (2020-present).
+//   Required input file: "yearly_data" which includes year and various required inputs such as
+//   month, assets, CPI-U, spending, and change in S&P500
+// Assumptions:
+//   spending comes first from fixed income assets (soc sec, annuity, dcp), then as needed from
+//   investments.
 // "diff" = "spent" - "fixed_income": fraction of "spent" which came from investments
 //   If negative, some of fixed_income actually got added to investments.
-// "delta_tax_april" = "tax_prvyr" - "tax_nxtyr"
+// "delta_tax_april" = "taxpaidfor_prvyr[thisyear]" - "taxpaidfor_prvyr[thisyear+1]"
 //   Changes invest_growth since taxes paid April current year actually should have been
 //     paid from assets in the previous year.
 // Invest_growth = net_worth_growth + diff + delta_tax_april.
@@ -24,7 +29,7 @@ int main ()
   int get_yridx (int);               // retrieve array index corresponding to year
 
   const char *infile = "yearly_data";
-  // Retired June, 2020. Annuity interest only started July, 2020. "annuity" monthly 
+  // Retired June, 2020. Annuity interest-only started July, 2020. "annuity" monthly 
   //   income therefore averaged over 12 months. Varied somewhat month to month
   // Started social security June, 2021. 1186. = 2033.*(7/12)
   // Turned 65 May, 2023. Began medicare, premiums taken from social security.
@@ -118,7 +123,7 @@ int main ()
     delta_tax_april = .001*(tax_prvyr[idx] - tax_prvyr[idxp1]);
   }
 
-  total_inflation      = (endcpi - begcpi) /  begcpi;
+  total_inflation = (endcpi - begcpi) /  begcpi;
   printf ("Total inflation for year %d month %d through month %d was %5.2lf%%\n",
 	  year, begmo, endmo, 100.*total_inflation);
   if (months != 12) {
@@ -130,7 +135,7 @@ int main ()
   change = endassets - begassets;    // total change in assets
   if (year == 2023) {
     printf ("In Sept. 2023 TIAA annuity was zeroed and changed to lifetime monthly stipend.\n"
-	    "  Adding 306. to asset change (change) to account for this\n");
+	    "  Adding 306. to asset change (change) to account for this initial annuity value\n");
     change += 306.;
   }
 
