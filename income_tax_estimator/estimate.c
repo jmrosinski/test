@@ -180,34 +180,42 @@ int main()
   // ALL of shortcg will be taxed as regular income, and ALL of longcg will be taxed at cgrate.
   // If net cap losses exceed $3K, only the $3K will be counted this year and carried over to the
   // next year.
-  
+
   if (shortcg >= 0. && longcg >= 0.) {
     income  += shortcg;
     capgains = longcg;
-    printf ("shortcg and longcg are both gains: shortcg=income, longcg taxed at cgrate=%d%%\n",
-	    (int) (cgfrac*100.));
-  } else {                    // at least one of shortcg, longcg is negative
+    printf ("shortcg($%.3lfK) adds to income, longcg($%.3lfK) taxed at cgrate=%d%%\n",
+	    shortcg, longcg, (int) (cgfrac*100.));
+  } else if (longcg >= 0. && shortcg < 0.) {
     capgains = shortcg + longcg;
-    if (capgains >= 0.) {     // one of shortcg, longcg is negative, the other non-negative
-      printf ("Net capgains non-negative due to shortcg=$%.3lfK, longcg=$%.3lfK\n", shortcg, longcg);
-      if (shortcg > longcg) { // shortcg is non-negative, longcg negative, so add the net to income
-	income += capgains;
-	// Zero capgains here: It's been added to income so it shouldn't be included in the
-	// capg_qdiv calculation below this bunch of nested "if" stuff
-	capgains = 0.;
-	printf ("    income increased to $%.3lfK\n", income);
-      } else {                // longcg is the positive one so leave as is and tax the net at cgrate
-	printf ("    Net capgains=$%.3lfK\n", capgains);
-      }
-    } else { // capgains < 0:Doesn't matter whether both or just one of shortcg, longcg are negative
-      printf ("cgloss=$%.3lfK due to shortcg=$%.3lfK longcg=$%.3lfK\n",
-	      capgains, shortcg, longcg);
-      carryover = fabs (fmin (0., capgains + cg_losslim)); // make "carryover" a non-negative number
-      capgains  = fmax (capgains, -cg_losslim);            // negative net gains cannont exceed $3K
-      printf ("  $%.3lfK will be treated as a loss and subtracted from income\n", capgains);
-      printf ("  $%.3lfK will be carried over to the next year\n", carryover);
+    if (capgains < 0.) {  // short losses exceed long gains
+      carryover = fmin (0., capgains + cg_losslim);
+      capgains  = fmax (capgains, -cg_losslim);      // negative net gains cannont exceed $3K
+      printf ("longcg=$%.3lfK shortcg=$%.3lfK reportable capgains=$%.3lfK carryover=$%.3lfK\n",
+	      longcg, shortcg, capgains, carryover);
+    } else {              // long gains exceed short losses
+      printf ("longcg=$%.3lfK shortcg=$%.3lfK capgains=$%.3lfK\n", longcg, shortcg, capgains);
     }
-  }
+  } else if (longcg < 0. && shortcg >= 0.) {
+    capgains = shortcg + longcg;
+    if (capgains >= 0.) { // short gains exceed long losses
+      income += capgains; 
+      printf ("shortcg gain($%.3lfK) exceeds longcg loss($%.3lfK). So the net($%.3lfK) is income and reportable capgains is 0.\n",
+	      shortcg, longcg, capgains);
+      capgains = 0.;
+    } else {              // long losses exceed short gains
+      carryover = fmin (0., capgains + cg_losslim);
+      capgains  = fmax (capgains, -cg_losslim);       // negative net gains cannont exceed $3K
+      printf ("longcg=$%.3lfK shortcg=$%.3lfK reportable capgains=$%.3lfK carryover=$%.3lfK\n",
+	      longcg, shortcg, capgains, carryover);
+    }
+  } else {                // shortcg < 0. & longcg < 0.
+    capgains = shortcg + longcg;
+    carryover = fmin (0., capgains + cg_losslim);
+    capgains  = fmax (capgains, -cg_losslim);         // negative net gains cannont exceed $3K
+    printf ("longcg=$%.3lfK shortcg=$%.3lfK reportable capgains=$%.3lfK carryover=$%.3lfK\n",
+	    longcg, shortcg, capgains, carryover);
+  } 
 
   // qdiv must be a positive number, but it's possible capgains+qdiv is negative. Thus fmax()
   capg_qdiv = fmax (0., capgains + qdiv);
