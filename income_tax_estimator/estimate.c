@@ -198,16 +198,16 @@ int main()
     }
   } else if (longcg < 0. && shortcg >= 0.) {
     capgains = shortcg + longcg;
-    if (capgains >= 0.) { // short gains exceed long losses
-      income += capgains; 
-      printf ("shortcg gain($%.3lfK) exceeds longcg loss($%.3lfK). So the net($%.3lfK) is income and reportable capgains is 0.\n",
-	      shortcg, longcg, capgains);
-      capgains = 0.;
-    } else {              // long losses exceed short gains
+    if (capgains < 0.) { // short gains exceed long losses
       carryover = fmin (0., capgains + cg_losslim);
       capgains  = fmax (capgains, -cg_losslim);       // negative net gains cannont exceed $3K
       printf ("longcg=$%.3lfK shortcg=$%.3lfK reportable capgains=$%.3lfK carryover=$%.3lfK\n",
 	      longcg, shortcg, capgains, carryover);
+    } else {              // long losses exceed short gains
+      income += capgains; 
+      printf ("shortcg gain($%.3lfK) exceeds longcg loss($%.3lfK). So the net($%.3lfK) is income and reportable capgains is 0.\n",
+	      shortcg, longcg, capgains);
+      capgains = 0.;
     }
   } else {                // shortcg < 0. & longcg < 0.
     capgains = shortcg + longcg;
