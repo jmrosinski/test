@@ -19,7 +19,7 @@ int main ()
 
   while (1) {
     printf ("Enter 0 to compute doubling time given input of rate\n");
-    printf ("Enter 1 to compute final amount given input of principle, rate, years\n");
+    printf ("Enter 1 to compute final amount given input of principle, rate, comp. freq.\n");
     printf ("Enter 2 to compute rate needed to achieve input of principle, years, final amount\n");
     printf ("Enter 3 to compute years needed to achieve input final amount, rate\n");
     printf ("Enter -1 when done\n");
@@ -72,8 +72,11 @@ void get_doubling (double r, int n)
 void get_amount (double P, double r, double t, int n)
 {
   double A = P*pow((1. + r/n), n*t);
+  double effrate = 100.*(A - P)/(P*t);
+  
   printf ("Principle=%.2lf rate=%.2lf%% years=%.2lf cf=%d -> final amount=%.2lf\n",
 	  P, r*100., t, n, A);
+  printf ("Effective rate=%.2lf%%\n", effrate);
 }
 
 void get_rate (double P, double t, double A, int n)
