@@ -7,6 +7,7 @@
 //   ./.estimate < [input_file]
 // User-supplied input file consistently requires floating point thousands of $
 // Assumptions:
+//   Filing status = Single
 //   User takes standard deduction rather than itemizing.
 //   Age 65+ is embedded in std_deduction[]. For other ages, just adjust this percentage
 //   Charitable deductions apply only to state income tax. 
@@ -41,22 +42,32 @@ int main()
   const double cgfrac = .15;    // Cap gains rate (fraction)
   const double ssfrac = .85;    // Fraction of social security that is taxed
   const double cg_losslim = 3.; // IRS limits net capital loss to $3K
-  int i;                 // loop index needs to be saved
-  int idx;               // user input: index into arrays to match "year"
-  int year;              // user input: year to estimate federal taxes
-  int topbracketidx;     // index of top income bracket
-  double income;         // user input: taxable income (not including US bond income)
-  double ira;            // IRA distributions total (just for comparison to income)
-  double usbondincome;   // income from USbonds. NOTE: CO doesn't tax US bond income
-  double shortcg;        // user input: short-term capital gains
-  double longcg;         // user input: long-term capital gains
-  double capgains;       // capital gains net
-  double carryover = 0.; // extent to which net capital LOSS exceeds $3K
-  double odiv;           // user input: ordinary dividends
-  double qdiv;           // user input: qualified dividends
-  double unqdiv;         // odiv - qdiv (unqualified dividends)
-  double capg_qdiv;      // capital gains + qualified dividends (assumed taxed at cgfrac)
-  double agi;            // adjusted gross income (income + ordinary dividends + cap gains)
+  int i;                   // loop index needs to be saved
+  int idx;                 // user input: index into arrays to match "year"
+  int year;                // user input: year to estimate federal taxes
+  int topbracketidx;       // index of top income bracket
+  double income;           // user input: taxable income (not including US bond income)
+  double ira;              // IRA distributions total (just for comparison to income)
+  double usbondincome;     // income from USbonds. NOTE: CO doesn't tax US bond income
+  double shortcg;          // user input: short-term capital gains
+  double longcg;           // user input: long-term capital gains
+  double capgains;         // capital gains net
+  double carryover = 0.;   // extent to which net capital LOSS exceeds $3K
+  double odiv;             // user input: ordinary dividends
+  double qdiv;             // user input: qualified dividends
+  double unqdiv;           // odiv - qdiv (unqualified dividends)
+  double capg_qdiv;        // capital gains + qualified dividends (assumed taxed at cgfrac)
+  double agi;              // adjusted gross income (income + ordinary dividends + cap gains)
+  // NIIT-specific settings
+  double MAGI;             // despised "modified agi"
+  const double MAGIthresh = 200.; // threshold above which Net Investment Income Tax (NIIT) MAY apply
+  const double NIITrate = 3.8;    // percent tax if NIIT applies
+  double ss_untaxed;       // soc sec income that is untaxed (1.-ssfrac)*ssincome
+  double taxfree_interest; // "tax-free" interest income that is taxable if NIIT applies
+  double invest_income;    // income from investments (per NIIT calculation)
+  double subject_to_NIIT;  // amount subject to NIIT (hopefully zero)
+  double NIIT;             // NIIT amount (hopefully zero)
+
   double taxable_income; // agi - std deduction - capg_qdiv
   double tax;            // estimated federal tax
   double cgtax;          // tax on cap gains+qdiv
@@ -147,6 +158,13 @@ int main()
   }
   printf ("Got long-term capital gains=$%.3lfK\n\n", longcg);
 
+  printf ("Enter tax free interest (line 2a, 1040). This is needed for NIIT estimate\n");
+  if (scanf ("%lf %*s", &taxfree_interest) < 1) {
+    printf ("tax-free interest not found. Quitting\n");
+    return -1;
+  }
+  printf ("Got tax-free interest=$%.3lfK\n\n", taxfree_interest);
+
   printf ("Enter charitable contributions (for now this only applies to CO tax)\n");
   if (scanf ("%lf %*s", &charity) < 1) {
     printf ("charity not found. Quitting\n");
@@ -231,6 +249,19 @@ int main()
   printf ("adjusted gross income=$%.3lfK\n", agi);
   printf ("capgains+qdiv (%.3lfK) portion of AGI is %.1lf%%\n", capg_qdiv, 100.*(capg_qdiv/agi));
 
+  ss_untaxed = (1. - ssfrac)*ssincome;
+  MAGI = agi + ss_untaxed + taxfree_interest;
+  printf ("MAGI estimated as agi + untaxed socsec + taxfree_interest=$%.3lfK\n", MAGI);
+  printf ("  NOTE the full calculation of MAGI is more complicated--see IRS Form 8960\n");
+
+  invest_income = taxfree_interest + odiv + capgains;
+  printf ("taxfree_interest ($%.3lfK) + odiv ($%.3lfK) + capgains ($%.3lfK) = invest_income ($%.3lfK)\n",
+	  taxfree_interest, odiv, capgains, invest_income);
+  subject_to_NIIT = fmax (0., fmin (MAGI - MAGIthresh, invest_income));
+  NIIT = 0.01*NIITrate*subject_to_NIIT;
+  printf ("subject_to_NIIT ($%.3lfK) * NIITrate (%3.1lf%%) = NIIT (%.3lfK)\n",
+	  subject_to_NIIT, NIITrate, NIIT);
+  
   // NOTE taxable income INCLUDES unqdiv (unqualified dividends)
   taxable_income = agi - std_deduction[idx] - capg_qdiv;
   printf ("taxable income, subtracting std deduction ($%.3lfK) and cg+qdiv($%.3lfK)=$%.3lfK\n",
@@ -264,14 +295,14 @@ int main()
   // Add tax on capital gains+qualified dividends
   cgtax = capg_qdiv*cgfrac;
   printf ("tax on cap gains+qdiv=$%.3lfK\n", cgtax);
-  tax += cgtax;
-  printf ("federal tax=$%.3lfK\n", tax);
+  tax += cgtax + NIIT;
+  printf ("federal tax (including NIIT if not zero)=$%.3lfK\n", tax);
   tax -= fedrebate;
   printf ("federal tax after rebates=$%.3lfK\n", tax);
   printf ("federal check to write (ie after withholding)=$%.3lfK\n\n", tax-fedwh);
 
   // Next: CO state tax calculation
-  ssreduce   = ssfrac*ssincome;
+  ssreduce   = ssfrac*ssincome;                  // CO doesn't tax social security income
   charity   -= fmin (charity - charity_adj, 0.); // CO reduces charity contribs by some amount
   reductions = ssreduce + charity + usbondincome;
   printf ("CO reductions to income=$%.3lfK\n", reductions);
