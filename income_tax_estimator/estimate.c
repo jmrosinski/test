@@ -345,8 +345,8 @@ int main()
   printf ("federal check to write (ie after withholding)=$%.3lfK\n\n", tax-fedwh);
 
   // Next: CO state tax calculation
-  ssreduce   = ssfrac*ssincome;                  // CO doesn't tax social security income
-  charity   -= fmin (charity - charity_adj, 0.); // CO reduces charity contribs by some amount
+  ssreduce   = ssfrac*ssincome;                          // CO doesn't tax social security income
+  charity = fmax (charity - charity_adj, 0.);            // CO reduces charity contribs by some amount
   reductions = ssreduce + charity + usbondincome;
   printf ("CO reductions to income=$%.3lfK\n", reductions);
   // CO taxes cap gains and ALL dividends (not just unqualified dividends) as regular income
