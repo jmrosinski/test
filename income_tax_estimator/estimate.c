@@ -58,22 +58,28 @@ int main()
   double unqdiv;           // odiv - qdiv (unqualified dividends)
   double capg_qdiv;        // capital gains + qualified dividends (assumed taxed at cgfrac)
   double agi;              // adjusted gross income (income + ordinary dividends + cap gains)
+  double sec199A;          // sec 199A dividends (entry 5 on 1099-DIV)
+  double foreign_tax;      // foreigh tax paid (entry 7 on 1099-DIV)
   // NIIT-specific settings
+  //   NOTE: income from tax-free muni bonds is NOT subject to this tax
   double MAGI;             // despised "modified agi"
+  double MAGI1, MAGI2;     // 2 different ways to compute MAGI (CONFUSING!!!)
+  int ans = 0;             // answer to question
   const double MAGIthresh = 200.; // threshold above which Net Investment Income Tax (NIIT) MAY apply
   const double NIITrate = 3.8;    // percent tax if NIIT applies
   double ss_untaxed;       // soc sec income that is untaxed (1.-ssfrac)*ssincome
-  double taxfree_interest; // "tax-free" interest income that is taxable if NIIT applies
+  double taxfree_interest; // tax-free interest income. Might be needed for NIIT but unused for now
   double invest_income;    // income from investments (per NIIT calculation)
   double subject_to_NIIT;  // amount subject to NIIT (hopefully zero)
   double NIIT;             // NIIT amount (hopefully zero)
 
-  double taxable_income; // agi - std deduction - capg_qdiv
-  double tax;            // estimated federal tax
-  double cgtax;          // tax on cap gains+qdiv
-  double ssincome;       // income from social security
-  double fedrebate;      // fed deduction from tax (e.g. heat pump)
-  double fedwh;          // fed withholding
+  double taxable_income;   // agi - std deduction - 0.2*sec199A
+  double use_taxtable;     // taxable_income - capg_qdiv
+  double tax;              // estimated federal tax
+  double cgtax;            // tax on cap gains+qdiv
+  double ssincome;         // income from social security
+  double fedrebate;        // fed deduction from tax (e.g. heat pump)
+  double fedwh;            // fed withholding
   // CO-specific items
   const double COtaxrate [NUMYRS] = {4.4, 4.25, 4.4}; // CO tax rate (%) for each year
   double ssreduce;               // Age 65 and above CO doesn't tax ss income
@@ -165,6 +171,20 @@ int main()
   }
   printf ("Got tax-free interest=$%.3lfK\n\n", taxfree_interest);
 
+  printf ("Enter sec 199A dividends (Entry 5, 1099-DIV).\n");
+  if (scanf ("%lf %*s", &sec199A) < 1) {
+    printf ("sec 199A dividends not found. Quitting\n");
+    return -1;
+  }
+  printf ("Got sec 199A dividends=$%.3lfK\n\n", sec199A);
+
+  printf ("Enter foreign tax paid (Entry 5, 1099-DIV).\n");
+  if (scanf ("%lf %*s", &foreign_tax) < 1) {
+    printf ("foreign tax paid not found. Quitting\n");
+    return -1;
+  }
+  printf ("Got foreign tax paid=$%.3lfK\n\n", foreign_tax);
+
   printf ("Enter charitable contributions (for now this only applies to CO tax)\n");
   if (scanf ("%lf %*s", &charity) < 1) {
     printf ("charity not found. Quitting\n");
@@ -250,46 +270,64 @@ int main()
   printf ("capgains+qdiv (%.3lfK) portion of AGI is %.1lf%%\n", capg_qdiv, 100.*(capg_qdiv/agi));
 
   ss_untaxed = (1. - ssfrac)*ssincome;
-  MAGI = agi + ss_untaxed + taxfree_interest;
-  printf ("MAGI estimated as agi + untaxed socsec + taxfree_interest=$%.3lfK\n", MAGI);
-  printf ("  NOTE the full calculation of MAGI is more complicated--see IRS Form 8960\n");
+  MAGI1 = agi;
+  printf ("MAGI1 estimated as agi=$%.3lfK\n", MAGI1);
 
-  invest_income = taxfree_interest + odiv + capgains;
-  printf ("taxfree_interest ($%.3lfK) + odiv ($%.3lfK) + capgains ($%.3lfK) = invest_income ($%.3lfK)\n",
-	  taxfree_interest, odiv, capgains, invest_income);
+  MAGI2 = agi + ss_untaxed;
+  printf ("MAGI2 estimated as agi + untaxed socsec=$%.3lfK\n", MAGI2);
+  printf ("The full calculation of MAGI is more complicated--see IRS Form 8960\n");
+
+  while (ans != 1 && ans != 2) {
+    printf ("Enter 1 to use MAGI1 or 2 to use MAGI2. Instr for 8960 line 13 indicate MAGI1 but \n"
+	    "web searches indicate MAGI2 (i.e. includes untaxed socsec)\n");
+    scanf ("%d", &ans);
+  }
+  if (ans == 1)
+    MAGI = MAGI1;
+  else
+    MAGI = MAGI2;
+  printf ("Using MAGI%d=$%.3lfK for MAGI calculation\n", ans, MAGI);
+
+  invest_income = odiv + capgains;
+  printf ("odiv ($%.3lfK) + capgains ($%.3lfK) = invest_income ($%.3lfK)\n",
+	  odiv, capgains, invest_income);
   subject_to_NIIT = fmax (0., fmin (MAGI - MAGIthresh, invest_income));
   NIIT = 0.01*NIITrate*subject_to_NIIT;
   printf ("subject_to_NIIT ($%.3lfK) * NIITrate (%3.1lf%%) = NIIT (%.3lfK)\n",
 	  subject_to_NIIT, NIITrate, NIIT);
   
-  // NOTE taxable income INCLUDES unqdiv (unqualified dividends)
-  taxable_income = agi - std_deduction[idx] - capg_qdiv;
-  printf ("taxable income, subtracting std deduction ($%.3lfK) and cg+qdiv($%.3lfK)=$%.3lfK\n",
-	  std_deduction[idx], capg_qdiv, taxable_income);
+  // NOTE "taxable_income" INCLUDES all dividends
+  // ASSUME 20% of sec199A dividends can be subtracted from income (IRS form 8995)
+  taxable_income = agi - std_deduction[idx] - 0.2*sec199A;
+  printf ("taxable income, subtracting std deduction ($%.3lfK) and 0.2*sec199A($%.3lfK)=$%.3lfK\n",
+	  std_deduction[idx], 0.2*sec199A, taxable_income);
 
-  if ((topbracketidx = get_topbracketidx (idx, taxable_income)) < 0) {
+  use_taxtable = taxable_income - capg_qdiv; // includes unqualified dividends
+  printf ("Adding capgains+qdiv($%.3lfK) to taxable income($%.3lfK) gives use_taxtable=$%.3lfK\n",
+	  capg_qdiv, taxable_income, use_taxtable);
+  if ((topbracketidx = get_topbracketidx (idx, use_taxtable)) < 0) {
     printf ("Cannot find top tax bracket index. Quitting\n");
     return -1;
   }
   printf ("Your top tax bracket (%.0lf%%) begins at $%.3lfK\n",
 	  taxrate[topbracketidx], kicksinat[idx][topbracketidx]);
 
-  if (taxable_income > kicksinat[idx][NUMBRACKETS-1]) {
-    printf ("Insufficient brackets:taxable_income=$%.3lfK exceeds top limit of $%.3lfK Quitting\n",
-	    taxable_income, kicksinat[idx][NUMBRACKETS-1]);
+  if (use_taxtable > kicksinat[idx][NUMBRACKETS-1]) {
+    printf ("Insufficient brackets:use_taxtable=$%.3lfK exceeds top limit of $%.3lfK Quitting\n",
+	    use_taxtable, kicksinat[idx][NUMBRACKETS-1]);
     return -1;
   }
 
   // Loop over tax brackets to figure total tax
   tax = 0.;
-  for (i = 0; i < NUMBRACKETS-1 && taxable_income >= kicksinat[idx][i]; ++i) {
-    double limit = fmin (kicksinat[idx][i+1], taxable_income);
+  for (i = 0; i < NUMBRACKETS-1 && use_taxtable >= kicksinat[idx][i]; ++i) {
+    double limit = fmin (kicksinat[idx][i+1], use_taxtable);
     tax += (limit - kicksinat[idx][i]) * 0.01*taxrate[i];  // 0.01 converts percent to fraction
-    if (taxable_income < kicksinat[idx][i+1])
+    if (use_taxtable < kicksinat[idx][i+1])
       break;
   }
-  printf ("taxable_income=$%.3lfK is %.3lfK from bumping into the next bracket of %.0lf%%\n",
-	  taxable_income, kicksinat[idx][i+1] - taxable_income, taxrate[i+1]);
+  printf ("use_taxtable=$%.3lfK is %.3lfK from bumping into the next bracket of %.0lf%%\n",
+	  use_taxtable, kicksinat[idx][i+1] - use_taxtable, taxrate[i+1]);
 	  
   printf ("tax on pure income=$%.3lfK\n", tax);
   // Add tax on capital gains+qualified dividends
@@ -297,8 +335,13 @@ int main()
   printf ("tax on cap gains+qdiv=$%.3lfK\n", cgtax);
   tax += cgtax + NIIT;
   printf ("federal tax (including NIIT if not zero)=$%.3lfK\n", tax);
-  tax -= fedrebate;
-  printf ("federal tax after rebates=$%.3lfK\n", tax);
+
+  tax -= foreign_tax;
+  printf ("federal tax after subtracting foreign tax($%.3lfK)=$%.3lfK\n", foreign_tax, tax);
+  if (fedrebate > 0.) {
+    tax -= fedrebate;
+    printf ("federal tax after rebates=$%.3lfK\n", tax);
+  }
   printf ("federal check to write (ie after withholding)=$%.3lfK\n\n", tax-fedwh);
 
   // Next: CO state tax calculation
@@ -307,8 +350,8 @@ int main()
   reductions = ssreduce + charity + usbondincome;
   printf ("CO reductions to income=$%.3lfK\n", reductions);
   // CO taxes cap gains and ALL dividends (not just unqualified dividends) as regular income
-  // NOTE taxable_income already INCLUDES unqualified dividends (unqdiv)
-  COincome   = taxable_income + capg_qdiv - reductions;
+  // NOTE use_taxtable already INCLUDES unqualified dividends (unqdiv)
+  COincome   = taxable_income - reductions;
   printf ("CO taxable income=$%.3lfK\n", COincome);
   COtax      = COincome*0.01*COtaxrate[idx];
   printf ("CO tax=$%.3lfK\n", COtax);
@@ -328,10 +371,10 @@ int get_yridx (int year)
   return -1;  // not found
 }
 
-int get_topbracketidx (int idx, double taxable_income)
+int get_topbracketidx (int idx, double use_taxtable)
 {
   for (int i=1; i<NUMBRACKETS; ++i) {
-    if (taxable_income <= kicksinat[idx][i])
+    if (use_taxtable <= kicksinat[idx][i])
       return i-1;
   }
   return -1;
