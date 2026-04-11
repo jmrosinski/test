@@ -26,18 +26,19 @@
 //     qualified dividends, US bond income, charity contributions, and qualified rebates are
 //     considered. If other significant tax issues apply, code must be added to account for it
 
-#define NUMYRS 3
+#define NUMYRS 4
 #define NUMBRACKETS 6
-const int idx_map[NUMYRS] = {2023,2024,2025}; // supported tax years
+const int idx_map[NUMYRS] = {2023,2024,2025,2026}; // supported tax years
 // kicksinat[][] is the income (thousands of $) at which the bracket starts  
 const double kicksinat[NUMYRS][NUMBRACKETS] = {{0.,11., 44.725, 95.375, 182.1  ,231.521},
 					       {0.,11.6,47.15, 100.525, 191.95 ,243.726},
-					       {0.,11.9,48.475,103.350, 197.301,250.526}};
+					       {0.,11.9,48.475,103.350, 197.301,250.526},
+					       {0.,12.4,50.400,105.700, 201.775,256.225}};
 int main()
 {
   // All dollar-based floating point settings and inputs are in thousands
   // std_deduction numbers assumes income exceeds threshhold thus the bonus $6K doesn't apply
-  const double std_deduction[NUMYRS] = {15.7, 16.55, 17.75};           // Assumes age 65+
+  const double std_deduction[NUMYRS] = {15.7, 16.55, 17.75, 18.15};    // Assumes age 65+
   const double taxrate [NUMBRACKETS] = {10., 12., 22., 24., 32., 35.}; // tax rate (%) for each bracket
   const double cgfrac = .15;    // Cap gains rate (fraction)
   const double ssfrac = .85;    // Fraction of social security that is taxed
@@ -81,12 +82,12 @@ int main()
   double fedrebate;        // fed deduction from tax (e.g. heat pump)
   double fedwh;            // fed withholding
   // CO-specific items
-  const double COtaxrate [NUMYRS] = {4.4, 4.25, 4.4}; // CO tax rate (%) for each year
+  const double COtaxrate [NUMYRS] = {4.4, 4.25, 4.4, 4.4}; // CO tax rate (%) for each year
   double ssreduce;               // Age 65 and above CO doesn't tax ss income
   const double charity_adj = .5; // CO reduces charitable contributions by this amount (thousand $)
   double charity;                // CO allows deductions for charitable contributions
   double COwh;                   // CO withholding
-  const double tabor[NUMYRS] = {0.8, 0.323, 0.}; // 0.323 is for AGI between $166K and $233K
+  const double tabor[NUMYRS] = {0.8, 0.323, 0., 0.}; // 0.323 is for AGI between $166K and $233K
   double reductions;             // reductions to income for CO tax purposes
   double COincome;               // income to apply CO tax rate to
   double COtax;                  // CO tax owed
