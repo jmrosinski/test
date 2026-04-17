@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 
 // Purpose: Estimate fed and state taxes owed for a given year. Also calculate size of check to
@@ -30,10 +31,10 @@
 #define NUMBRACKETS 6
 const int idx_map[NUMYRS] = {2023,2024,2025,2026}; // supported tax years
 // kicksinat[][] is the income (thousands of $) at which the bracket starts  
-const double kicksinat[NUMYRS][NUMBRACKETS] = {{0.,11., 44.725, 95.375, 182.1  ,231.521},
-					       {0.,11.6,47.15, 100.525, 191.95 ,243.726},
-					       {0.,11.9,48.475,103.350, 197.301,250.526},
-					       {0.,12.4,50.400,105.700, 201.775,256.225}};
+const double kicksinat[NUMYRS][NUMBRACKETS] = {{0.,11., 44.725, 95.375,182.1  ,231.521},
+					       {0.,11.6,47.15, 100.525,191.95 ,243.726},
+					       {0.,11.9,48.475,103.350,197.301,250.526},
+					       {0.,12.4,50.400,105.700,201.775,256.225}};
 int main()
 {
   // All dollar-based floating point settings and inputs are in thousands
@@ -43,9 +44,11 @@ int main()
   const double cgfrac = .15;    // Cap gains rate (fraction)
   const double ssfrac = .85;    // Fraction of social security that is taxed
   const double cg_losslim = 3.; // IRS limits net capital loss to $3K
+  const int negok = 0;     // flag indicates negative value allowed so no need to check for that
+  const int negnotok = 1;  // flag indicates negative value not allowed so check for that
   int i;                   // loop index needs to be saved
   int idx;                 // user input: index into arrays to match "year"
-  int year;                // user input: year to estimate federal taxes
+  int year;                // user input: year to estimate federal and CO taxes
   int topbracketidx;       // index of top income bracket
   double income;           // user input: taxable income (not including US bond income)
   double ira;              // IRA distributions total (just for comparison to income)
@@ -95,6 +98,7 @@ int main()
   // function prototypes
   int get_yridx (int);                 // find index to match year
   int get_topbracketidx (int, double); // find index of top tax bracket
+  void getdouble (double *, const int, char *, char *); // read a line and set double value
 
   printf ("Enter tax year for calculation:\n");
   if (scanf ("%d %*s", &year) < 1) {
@@ -107,112 +111,25 @@ int main()
   }
   printf ("Estimating federal tax for year=%d\n", year);
   printf ("NOTE: All requested input is expected in floating point thousands of dollars\n");
-  
-  printf ("Enter taxable income exclude ss, capgains, dividends and USbonds (maybe 4b+5b of 1040)\n");
-  if (scanf ("%lf %*s", &income) < 1 || income < 0.) {
-    printf ("income not found or negative. Quitting\n");
-    return -1;
-  }
-  printf ("Got income=$%.3lfK\n", income);
 
-  printf ("Enter IRA distributions (subset of taxable income)\n");
-  if (scanf ("%lf %*s", &ira) < 1 || ira < 0. || ira > income) {
-    printf ("income not found, negative, or exceeds total income. Quitting\n");
-    return -1;
-  }
-  printf ("Got ira distributions=$%.3lfK\n", ira);
-
-  printf ("Enter total social security income\n");
-  if (scanf ("%lf %*s", &ssincome) < 1 || ssincome < 0.) {
-    printf ("social security income not found or negative. Quitting\n");
-    return -1;
-  }
-  printf ("Got social security income=$%.3lfK\n", ssincome);
-
-  printf ("Enter income from US bonds ()\n");
-  if (scanf ("%lf %*s", &usbondincome) < 1 || usbondincome < 0.) {
-    printf ("income from US bonds not found or negative. Quitting\n");
-    return -1;
-  }
-  printf ("Got US bond income=$%.3lfK\n", usbondincome);
+  getdouble (&income, negnotok, "taxable income",
+	     "excluding ss, capgains, dividends and USbonds (maybe 4b+5b of 1040)");
+  getdouble (&ira, negnotok, "IRA distributions", "");
+  getdouble (&ssincome, negnotok, "social security income", "");
+  getdouble (&usbondincome, negnotok, "US bond income", "");
   income += ssfrac*ssincome + usbondincome;
 
-  printf ("Enter ordinary dividends (maybe line 3b of 1040)\n");
-  if (scanf ("%lf %*s", &odiv) < 1 || odiv < 0.) {
-    printf ("ordinary dividend income not found or negative. Quitting\n");
-    return -1;
-  }
-  printf ("Got ordinary dividend income=$%.3lfK\n", odiv);
-
-  printf ("Enter qualified dividends (maybe line 3a of 1040)\n");
-  if (scanf ("%lf %*s", &qdiv) < 1 || qdiv < 0.) {
-    printf ("qualified dividend income not found or negative. Quitting\n");
-    return -1;
-  }
-  printf ("Got qualified dividend income=$%.3lfK\n", qdiv);
-
-  printf ("Enter short-term capital gains (maybe line 7 of schedule D)\n");
-  if (scanf ("%lf %*s", &shortcg) < 1) {
-    printf ("short term capital gains not found. Quitting\n");
-    return -1;
-  }
-  printf ("Got short-term capital gains=$%.3lfK\n", shortcg);
-    
-  printf ("Enter long-term capital gains (maybe line 15 of schedule D)\n");
-  if (scanf ("%lf %*s", &longcg) < 1) {
-    printf ("long term capital gains not found. Quitting\n");
-    return -1;
-  }
-  printf ("Got long-term capital gains=$%.3lfK\n\n", longcg);
-
-  printf ("Enter tax free interest (line 2a, 1040). This is needed for NIIT estimate\n");
-  if (scanf ("%lf %*s", &taxfree_interest) < 1) {
-    printf ("tax-free interest not found. Quitting\n");
-    return -1;
-  }
-  printf ("Got tax-free interest=$%.3lfK\n\n", taxfree_interest);
-
-  printf ("Enter sec 199A dividends (Entry 5, 1099-DIV).\n");
-  if (scanf ("%lf %*s", &sec199A) < 1) {
-    printf ("sec 199A dividends not found. Quitting\n");
-    return -1;
-  }
-  printf ("Got sec 199A dividends=$%.3lfK\n\n", sec199A);
-
-  printf ("Enter foreign tax paid (Entry 5, 1099-DIV).\n");
-  if (scanf ("%lf %*s", &foreign_tax) < 1) {
-    printf ("foreign tax paid not found. Quitting\n");
-    return -1;
-  }
-  printf ("Got foreign tax paid=$%.3lfK\n\n", foreign_tax);
-
-  printf ("Enter charitable contributions (for now this only applies to CO tax)\n");
-  if (scanf ("%lf %*s", &charity) < 1) {
-    printf ("charity not found. Quitting\n");
-    return -1;
-  }
-  printf ("Got charitable contributions=$%.3lfK\n\n", charity);
-
-  printf ("Enter federal rebates total (to be subtracted from tax owed)\n");
-  if (scanf ("%lf %*s", &fedrebate) < 1) {
-    printf ("fed rebate not found. Quitting\n");
-    return -1;
-  }
-  printf ("Got fed rebates=$%.3lfK\n\n", fedrebate);
-
-  printf ("Enter federal withholding\n");
-  if (scanf ("%lf %*s", &fedwh) < 1) {
-    printf ("federal withholding not found. Quitting\n");
-    return -1;
-  }
-  printf ("Got federal withholding=$%.3lfK\n\n", fedwh);
-
-  printf ("Enter CO withholding\n");
-  if (scanf ("%lf %*s", &COwh) < 1) {
-    printf ("CO withholding not found. Quitting\n");
-    return -1;
-  }
-  printf ("Got CO withholding=$%.3lfK\n\n", COwh);
+  getdouble (&odiv,negnotok, "ordinary dividends", "(maybe line 3b of 1040)");
+  getdouble (&qdiv, negnotok, "qualified dividends", "(maybe line 3a of 1040)");
+  getdouble (&shortcg, negok, "short-term capital gains", "(maybe line 7 of schedule D)");
+  getdouble (&longcg, negok, "long-term capital gains", "(maybe line 15 of schedule D)");
+  getdouble (&taxfree_interest, negnotok, "tax free interest", "(line 2a, 1040). Needed for NIIT");
+  getdouble (&sec199A, negnotok, "sec 199A dividends", "(Entry 5, 1099-DIV)");
+  getdouble (&foreign_tax, negnotok, "foreign tax paid", "(Entry 5, 1099-DIV)");
+  getdouble (&charity, negnotok, "charitable contributions", "(only applies to CO tax)");
+  getdouble (&fedrebate, negnotok, "federal rebates total", "(to be subtracted from tax owed)");
+  getdouble (&fedwh, negnotok, "federal withholding", "");
+  getdouble (&COwh, negnotok, "CO withholding", "");
 
   // Figure rate on capital gains. Some fraction of short-term gains will be taxed as regular
   // income if net gains (short+long) are positive. If both shortcg and longcg are positive,
@@ -379,4 +296,18 @@ int get_topbracketidx (int idx, double use_taxtable)
       return i-1;
   }
   return -1;
+}
+
+void getdouble (double *val, const int flag, char *str1, char *str2)
+{
+  printf ("Enter %s %s\n", str1, str2);
+  if (scanf ("%lf %*s", val) < 1) {
+    printf ("%s not found. Quitting\n", str1);
+    exit (-1);
+  }
+  if (flag && *val < 0.) {  // flag true means negative value not ok
+    printf ("%s=$%.3lfK cannot be negative. Quitting\n", str1, *val);
+    exit (-1);
+  }
+  printf ("Got %s=$%.3lfK\n", str1, *val);
 }
