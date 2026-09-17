@@ -14,15 +14,15 @@
 //   Charitable deductions apply only to state income tax. 
 //   AMT doesn't apply. If it does apply, additional code will have to be written to account for it
 //   State is Colorado. For others, rewrite code after the comment // Next: CO state tax calculation
-//   Tax years 2023-2025 are supported. Adding a year just requires increasing NUMYRS and filling
+//   Tax years 2023-2026 are supported. Adding a year just requires increasing NUMYRS and filling
 //     idx_map[], kicksinat[][] and std_deduction[] entries.
 //   Top fed bracket supported is kicksinat[][NUMBRACKETS-2]. The value for [NUMBRACKETS-1] exists
 //     in order to show how far you are from hitting the next higher bracket.
 //   Cap gains and qualified deductions rates are assumed to be 15%. If this is incorrect for
-//     a given user, additional code must be written to account for it (yuck).
+//     a given user, additional code must be written to account for it.
 //   In 2025 a "bonus" to the standard deduction was added, but phases out above certain income
 //     levels. It is ASSUMED that the user doesn't qualify for the bonus. Code would have to be
-//     written to account for the phaseout (yuck).
+//     written to account for the phaseout.
 //   Only taxable income (including social security), short and long cap gains, ordinary and
 //     qualified dividends, US bond income, charity contributions, and qualified rebates are
 //     considered. If other significant tax issues apply, code must be added to account for it
@@ -47,7 +47,7 @@ int main()
   const int negok = 0;     // flag indicates negative value allowed so no need to check for that
   const int negnotok = 1;  // flag indicates negative value not allowed so check for that
   int i;                   // loop index needs to be saved
-  int idx;                 // user input: index into arrays to match "year"
+  int idx;                 // index into arrays to match "year"
   int year;                // user input: year to estimate federal and CO taxes
   int topbracketidx;       // index of top income bracket
   double income;           // user input: taxable income (not including US bond income)
@@ -67,7 +67,6 @@ int main()
   // NIIT-specific settings
   //   NOTE: income from tax-free muni bonds is NOT subject to this tax
   double MAGI;             // despised "modified agi"
-  double MAGI1, MAGI2;     // 2 different ways to compute MAGI (CONFUSING!!!)
   int ans = 0;             // answer to question
   const double MAGIthresh = 200.; // threshold above which Net Investment Income Tax (NIIT) MAY apply
   const double NIITrate = 3.8;    // percent tax if NIIT applies
@@ -125,7 +124,7 @@ int main()
   getdouble (&longcg, negok, "long-term capital gains", "(maybe line 15 of schedule D)");
   getdouble (&taxfree_interest, negnotok, "tax free interest", "(line 2a, 1040). Needed for NIIT");
   getdouble (&sec199A, negnotok, "sec 199A dividends", "(Entry 5, 1099-DIV)");
-  getdouble (&foreign_tax, negnotok, "foreign tax paid", "(Entry 5, 1099-DIV)");
+  getdouble (&foreign_tax, negnotok, "foreign tax paid", "(Entry 7, 1099-DIV)");
   getdouble (&charity, negnotok, "charitable contributions", "(only applies to CO tax)");
   getdouble (&fedrebate, negnotok, "federal rebates total", "(to be subtracted from tax owed)");
   getdouble (&fedwh, negnotok, "federal withholding", "");
@@ -188,24 +187,11 @@ int main()
   printf ("capgains+qdiv (%.3lfK) portion of AGI is %.1lf%%\n", capg_qdiv, 100.*(capg_qdiv/agi));
 
   ss_untaxed = (1. - ssfrac)*ssincome;
-  MAGI1 = agi;
-  printf ("MAGI1 estimated as agi=$%.3lfK\n", MAGI1);
-
-  MAGI2 = agi + ss_untaxed;
-  printf ("MAGI2 estimated as agi + untaxed socsec=$%.3lfK\n", MAGI2);
-  printf ("The full calculation of MAGI is more complicated--see IRS Form 8960\n");
-
-  while (ans != 1 && ans != 2) {
-    printf ("Enter 1 to use MAGI1 or 2 to use MAGI2. Instr for 8960 line 13 indicate MAGI1 but \n"
-	    "web searches indicate MAGI2 (i.e. includes untaxed socsec)\n");
-    scanf ("%d", &ans);
-  }
-  if (ans == 1)
-    MAGI = MAGI1;
-  else
-    MAGI = MAGI2;
-  printf ("Using MAGI%d=$%.3lfK for MAGI calculation\n", ans, MAGI);
-
+  MAGI = agi;
+  printf ("MAGI estimated as agi=$%.3lfK\n", MAGI);
+  if (MAGI < MAGIthresh)
+    printf ("  MAGI headroom=$%.3lfK\n", MAGIthresh - MAGI);
+  
   invest_income = odiv + capgains;
   printf ("odiv ($%.3lfK) + capgains ($%.3lfK) = invest_income ($%.3lfK)\n",
 	  odiv, capgains, invest_income);
@@ -221,7 +207,7 @@ int main()
 	  std_deduction[idx], 0.2*sec199A, taxable_income);
 
   use_taxtable = taxable_income - capg_qdiv; // includes unqualified dividends
-  printf ("Adding capgains+qdiv($%.3lfK) to taxable income($%.3lfK) gives use_taxtable=$%.3lfK\n",
+  printf ("Subtracting capgains+qdiv($%.3lfK) fm taxable income($%.3lfK) gives use_taxtable=$%.3lfK\n",
 	  capg_qdiv, taxable_income, use_taxtable);
   if ((topbracketidx = get_topbracketidx (idx, use_taxtable)) < 0) {
     printf ("Cannot find top tax bracket index. Quitting\n");
@@ -244,7 +230,7 @@ int main()
     if (use_taxtable < kicksinat[idx][i+1])
       break;
   }
-  printf ("use_taxtable=$%.3lfK is %.3lfK from bumping into the next bracket of %.0lf%%\n",
+  printf ("use_taxtable=$%.3lfK leaves %.3lfK headroom to the next bracket of %.0lf%%\n",
 	  use_taxtable, kicksinat[idx][i+1] - use_taxtable, taxrate[i+1]);
 	  
   printf ("tax on pure income=$%.3lfK\n", tax);
@@ -280,6 +266,7 @@ int main()
   return 0;
 }
 
+// get_yridx: Find index into arrays dimensioned [NUMYRS] for input year
 int get_yridx (int year)
 {
   for (int i=0; i<NUMYRS; ++i) {
@@ -289,6 +276,8 @@ int get_yridx (int year)
   return -1;  // not found
 }
 
+// get_topbracketidx(): Discover top tax bracket. Function failure indicates arrays dimensioned
+//                      [NUMBRACKETS] require at least one more entry
 int get_topbracketidx (int idx, double use_taxtable)
 {
   for (int i=1; i<NUMBRACKETS; ++i) {
@@ -298,6 +287,8 @@ int get_topbracketidx (int idx, double use_taxtable)
   return -1;
 }
 
+// getdouble(): Use scanf to read a line fm stdin, place 1st entry in double pointed to by "val".
+//              If "flag" is true, ensure negative values not allowed. If false, ignore
 void getdouble (double *val, const int flag, char *str1, char *str2)
 {
   printf ("Enter %s %s\n", str1, str2);
