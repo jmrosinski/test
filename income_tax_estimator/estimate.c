@@ -29,6 +29,7 @@
 
 #define NUMYRS 4
 #define NUMBRACKETS 6
+#define NUMBUCKETS NUMBRACKETS+2                   // +2 for capgains, NIIT
 const int idx_map[NUMYRS] = {2023,2024,2025,2026}; // supported tax years
 // kicksinat[][] is the income (thousands of $) at which the bracket starts  
 const double kicksinat[NUMYRS][NUMBRACKETS] = {{0.,11., 44.725, 95.375,182.1  ,231.521},
@@ -41,7 +42,9 @@ int main()
   // std_deduction numbers assumes income exceeds threshhold thus the bonus $6K doesn't apply
   const double std_deduction[NUMYRS] = {15.7, 16.55, 17.75, 18.15};    // Assumes age 65+
   const double taxrate [NUMBRACKETS] = {10., 12., 22., 24., 32., 35.}; // tax rate (%) for each bracket
+  double buckets[NUMBUCKETS] = {0.};// fed tax on various income buckets
   const double cgfrac = .15;    // Cap gains rate (fraction)
+  const double cgrate = 100.*cgfrac;    // Cap gains rate (%)
   const double ssfrac = .85;    // Fraction of social security that is taxed
   const double cg_losslim = 3.; // IRS limits net capital loss to $3K
   const int negok = 0;     // flag indicates negative value allowed so no need to check for that
@@ -140,7 +143,7 @@ int main()
     income  += shortcg;
     capgains = longcg;
     printf ("1: shortcg($%.3lfK) adds to income, longcg($%.3lfK) taxed at cgrate=%d%%\n",
-	    shortcg, longcg, (int) (cgfrac*100.));
+	    shortcg, longcg, (int) cgrate);
   } else if (longcg >= 0. && shortcg < 0.) {
     capgains = shortcg + longcg;
     if (capgains < 0.) {  // short losses exceed long gains
@@ -175,7 +178,7 @@ int main()
   // qdiv must be a positive number, but it's possible capgains+qdiv is negative. Thus fmax()
   capg_qdiv = fmax (0., capgains + qdiv);
   printf ("cap gains + qualified dividends=$%.3lfK ASSUMED to be federally taxed at %d%%\n",
-	  capg_qdiv, (int) (cgfrac*100.));
+	  capg_qdiv, (int) cgrate);
 
   unqdiv = odiv - qdiv;
   printf ("unqualified dividends=$%.3lfK federally taxed as regular income\n", unqdiv);
@@ -197,7 +200,7 @@ int main()
 	  odiv, capgains, invest_income);
   subject_to_NIIT = fmax (0., fmin (MAGI - MAGIthresh, invest_income));
   NIIT = 0.01*NIITrate*subject_to_NIIT;
-  printf ("subject_to_NIIT ($%.3lfK) * NIITrate (%3.1lf%%) = NIIT (%.3lfK)\n",
+  printf ("subject_to_NIIT ($%.3lfK) * NIITrate (%3.1lf%%) = NIIT ($%.3lfK)\n",
 	  subject_to_NIIT, NIITrate, NIIT);
   
   // NOTE "taxable_income" INCLUDES all dividends
@@ -225,8 +228,10 @@ int main()
   // Loop over tax brackets to figure total tax
   tax = 0.;
   for (i = 0; i < NUMBRACKETS-1 && use_taxtable >= kicksinat[idx][i]; ++i) {
+    // "limit" defines the top end owed for bracket [i].
     double limit = fmin (kicksinat[idx][i+1], use_taxtable);
-    tax += (limit - kicksinat[idx][i]) * 0.01*taxrate[i];  // 0.01 converts percent to fraction
+    buckets[i] = limit - kicksinat[idx][i];
+    tax += buckets[i]*0.01*taxrate[i];       // 0.01 converts % to fraction
     if (use_taxtable < kicksinat[idx][i+1])
       break;
   }
@@ -236,9 +241,46 @@ int main()
   printf ("tax on pure income=$%.3lfK\n", tax);
   // Add tax on capital gains+qualified dividends
   cgtax = capg_qdiv*cgfrac;
-  printf ("tax on cap gains+qdiv=$%.3lfK\n", cgtax);
+  printf ("tax on cap gains+qdiv before applying (if applicablie) NIIT=$%.3lfK\n", cgtax);
   tax += cgtax + NIIT;
-  printf ("federal tax (including NIIT if not zero)=$%.3lfK\n", tax);
+  printf ("federal tax (including NIIT if not zero)=$%.3lfK\n\n", tax);
+
+  printf ("federal tax on various income buckets BEFORE subtracting foreign tax, fed rebates\n");
+
+  // Print additional info about tax on each income and cg and NIIT bucket
+  double bucket_tax;
+  double total = 0.;
+  for (i = 0; i < NUMBRACKETS-1; ++i) {
+    if (buckets[i] > 0.) {
+      bucket_tax = buckets[i]*0.01*taxrate[i];
+      printf ("income bucket        %d($%.3lfK) taxed at %.0lf%%=$%.3lfK\n",
+	      i, buckets[i], taxrate[i], bucket_tax);
+      total += bucket_tax;
+    }
+  }
+  i = NUMBRACKETS + 1; // skip over top bracket since it is not used for tax calculation
+  buckets[i] = capg_qdiv - subject_to_NIIT;
+  if (buckets[i] > 0.) {
+    bucket_tax = buckets[i]*cgfrac;
+    printf ("capgains+qdiv bucket %d($%.3lfK) taxed at %.0lf%%=$%.3lfK\n",
+	    i, buckets[i], cgrate, bucket_tax);
+    total += bucket_tax;
+  }
+  
+  ++i;
+  buckets[i] = subject_to_NIIT;
+  if (buckets[i] > 0.) {
+    bucket_tax = buckets[i]*0.01*(cgrate + NIITrate);
+    printf ("NIIT bucket          %d($%.3lfK) taxed at %.1lf%%=$%.3lfK\n",
+	    i, buckets[i], cgrate + NIITrate, bucket_tax);
+    total += bucket_tax;
+  }
+  // Verify total calculation good to roundoff
+  const double tolerance = 1.e-7;
+  if (fabs((total - tax)/tax) > tolerance) {
+    printf ("WARNING: tax($%.3lf) differs from bucket total($%.3lf) by too much!\n", tax, total);
+  }
+  printf ("\n");
 
   tax -= foreign_tax;
   printf ("federal tax after subtracting foreign tax($%.3lfK)=$%.3lfK\n", foreign_tax, tax);
