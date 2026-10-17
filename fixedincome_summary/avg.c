@@ -10,11 +10,13 @@ int main ()
   float inflation;             // inflation (%)
   float amt, amttot;           // current value ($)
   float income, incometot;     // income
-  float actual, actualtot;     // income after taxes
+  float infl_adj, infl_adj_tot;// adjusted income due to inflation
+  float afttax, afttaxtot;     // income after taxes
   float realized, realizedtot; // realized gain after taxes and inflation
   float rate;                  // interest rate (%) 
-  float basis, basistot;       // cost basis
+  float basis;                 // cost basis (currently unused)
   float taxrate;               // aggregate tax rate (%)
+  float tax, taxtot;           // tax and total tax
   float wbar;
   int nument;
 
@@ -34,12 +36,13 @@ int main ()
 
   // Skip EXACTLY 1 LINE (header)
   fgets (line, LINESIZE, fp);
-  nument      = 0;
-  amttot      = 0.;
-  incometot   = 0.;
-  actualtot   = 0.;
-  realizedtot = 0.;
-  basistot    = 0.;
+  nument       = 0;
+  amttot       = 0.;
+  incometot    = 0.;
+  afttaxtot    = 0.;
+  realizedtot  = 0.;
+  taxtot       = 0.;
+  infl_adj_tot = 0.;
   // Parse input lines assuming entries are: amount rate basis taxrate comment
   while (fgets (line, LINESIZE, fp) != NULL) {
     if (sscanf (line, "%f %f %f %f %*s", &amt, &rate, &basis, &taxrate) != 4) {
@@ -50,23 +53,27 @@ int main ()
     taxrate *= 0.01;
     ++nument;
     income   = amt*rate;
-    actual   = income*(1. - taxrate);
-    // To compute "realized", inflation only applies to "amt" lessened by income*taxrate because
-    // income*taxrate has already gone to the government (see "actual" computation above)
-    realized = actual - inflation*(amt - income*taxrate);
+    tax      = income*taxrate;
+    afttax   = income - tax;
+    // To compute "realized", inflation only applies to "amt" lessened by tax because
+    // "tax" has already gone to the government (see "afttax" computation above)
+    infl_adj = inflation*(amt - tax);
+    realized = afttax - infl_adj;
 
-    amttot      += amt;
-    incometot   += income;
-    actualtot   += actual;
-    realizedtot += realized;
-    basistot    += basis;
+    amttot       += amt;
+    incometot    += income;
+    afttaxtot    += afttax;
+    realizedtot  += realized;
+    taxtot       += tax;
+    infl_adj_tot += infl_adj;
   }
   wbar = incometot / amttot;
   printf ("total fixed income assets=%f K\n", amttot);
-  printf ("total fixed income basis= %f K\n", basistot);
   printf ("weighted rate for %d entries=%f percent\n", nument, 100.*wbar);
   printf ("yearly income=$%.2fK\n", incometot);
-  printf ("yearly income after taxes taken out=$%.2fK\n", actualtot);
+  printf ("yearly total tax=$%.2fK\n", taxtot);
+  printf ("yearly total inflation adjustment=$%.2fK\n", -infl_adj_tot);
+  printf ("yearly income after taxes taken out=$%.2fK\n", afttaxtot);
   printf ("yearly income after taxes and inflation taken out=$%.2fK\n", realizedtot);
   return 0;
 }
